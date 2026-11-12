@@ -1,0 +1,1630 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QuickbackAI Prototype</title>
+<style>
+/* Layout: one-screen presenter app — header with step nav, a narration column beside a simulated Microsoft 365 screen, footer with scenario switch */
+:root{
+  --brand:#E2005A; --brand-dark:#b80049; --brand-soft:#fde7f0;
+  --ink:#1d2127; --ink2:#3d454f; --muted:#5f6873; --line:#e2e5e9; --bg:#f2f3f5; --card:#fff;
+  --teams:#5B5FC7; --teams-soft:#ececf9; --outlook:#0F6CBD; --outlook-soft:#e3eefa;
+  --sp:#037f82; --sp-soft:#e0f2f2; --pa:#0b63e5; --pa-soft:#e5effd;
+  --pbi:#8a6700; --pbi-soft:#fdf4d3; --ai:#6b35e0; --ai-soft:#efe8fd;
+  --pos:#1a7f37; --pos-soft:#e3f3e7; --neg:#c42b1c; --neg-soft:#fbe8e5; --neu:#7a6000; --neu-soft:#faf1d6;
+  --grey-series:#7d8794;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);font-size:15px;line-height:1.45}
+button{font:inherit;cursor:pointer}
+.app{display:grid;grid-template-rows:auto 1fr auto;height:100%}
+
+/* ---------- top bar ---------- */
+header.top{display:flex;align-items:center;gap:14px;padding:8px 18px;background:#fff;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;white-space:nowrap}
+.logo .mark{width:32px;height:32px;border-radius:9px;background:var(--brand);display:grid;place-items:center}
+.logo small{display:block;font-weight:400;color:var(--muted);font-size:12px;line-height:1.2}
+@media (max-width:1450px){.logo small{display:none}}
+nav.steps{display:flex;gap:4px;flex:1;justify-content:center;flex-wrap:wrap}
+nav.steps button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 10px;font-size:12.5px;color:var(--muted);white-space:nowrap}
+nav.steps button.done{color:var(--ink2);border-color:#cfd4da}
+nav.steps button.active{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+.top-actions{display:flex;gap:6px}
+.btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 14px;font-size:14px;color:var(--ink);display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:#c4c9cf}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+.btn.primary:hover{background:var(--brand-dark)}
+.btn.small{padding:4px 10px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:default}
+
+main{overflow:auto;padding:18px}
+footer.bottom{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 18px;background:#fff;border-top:1px solid var(--line)}
+footer .caption{color:var(--muted);font-size:13px;text-align:center;flex:1}
+footer .caption b{color:var(--ink)}
+
+/* ---------- scenes ---------- */
+.scene{display:none;max-width:1320px;margin:0 auto;grid-template-columns:300px minmax(0,1fr);gap:18px;align-items:start}
+.scene.active{display:grid;animation:fade .35s ease}
+.scene.full{grid-template-columns:minmax(0,1fr)}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.narr{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;position:sticky;top:0}
+.narr .tag{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--brand);margin-bottom:6px}
+.narr h2{margin:0 0 8px;font-size:22px;line-height:1.2}
+.narr p{margin:0 0 10px;color:var(--ink2)}
+.narr .try{background:var(--brand-soft);border-radius:10px;padding:10px 12px;font-size:14px;margin:12px 0}
+.narr .try b{color:var(--brand-dark)}
+.narr .note{font-size:12.5px;color:var(--muted);margin-top:10px}
+.narr ul{margin:0 0 10px;padding-left:18px;color:var(--ink2)}
+.narr li{margin:3px 0}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.chips .lbl{width:100%;font-size:12px;color:var(--muted);font-weight:600}
+.chip{font-size:12px;font-weight:600;border-radius:999px;padding:3px 10px;white-space:nowrap}
+.c-teams{background:var(--teams-soft);color:#3f43a8}.c-outlook{background:var(--outlook-soft);color:var(--outlook)}
+.c-sp{background:var(--sp-soft);color:var(--sp)}.c-pa{background:var(--pa-soft);color:var(--pa)}
+.c-pbi{background:var(--pbi-soft);color:var(--pbi)}.c-ai{background:var(--ai-soft);color:var(--ai)}
+
+.screen{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 6px 24px rgba(20,25,35,.06);position:relative;min-width:0}
+.screen .bar{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--line);background:#fafbfc;font-size:13px;color:var(--muted)}
+.screen .bar .dot{width:10px;height:10px;border-radius:3px}
+.screen .bar b{color:var(--ink)}
+.screen .bar .sim{margin-left:auto;font-size:11px;border:1px dashed #c9ced4;border-radius:6px;padding:1px 7px}
+
+/* ---------- intro ---------- */
+.hero{background:#fff;border:1px solid var(--line);border-radius:18px;padding:34px 38px;display:grid;grid-template-columns:1.1fr 1fr;gap:34px;align-items:center}
+.hero .kick{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--brand)}
+.hero h1{font-size:40px;line-height:1.1;margin:6px 0 10px}
+.hero h1 span{color:var(--brand)}
+.hero .lead{font-size:18px;color:var(--ink2);margin:0 0 20px}
+.pg{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:22px}
+.pg div{border-radius:12px;padding:12px 14px;font-size:14px}
+.pg .today{background:#f4f5f7}.pg .goal{background:var(--brand-soft)}
+.pg b{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.pg .goal b{color:var(--brand-dark)}
+.scenario{border:1px solid var(--line);border-radius:14px;padding:18px 20px;background:#fcfcfd;min-width:0}
+.scenario h3{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:15px}
+.facts dt{color:var(--muted)}.facts dd{margin:0;font-weight:600}
+.pill{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:600;white-space:nowrap}
+.p-neg{background:var(--neg-soft);color:var(--neg)}.p-pos{background:var(--pos-soft);color:var(--pos)}
+.p-neu{background:#eef0f3;color:var(--ink2)}.p-blue{background:var(--outlook-soft);color:var(--outlook)}
+.p-warn{background:var(--neu-soft);color:var(--neu)}
+.keys{font-size:13px;color:var(--muted);margin-top:14px}
+kbd{border:1px solid #cfd4da;border-bottom-width:2px;border-radius:5px;padding:0 6px;font-family:inherit;font-size:12px;background:#fff}
+.scpick{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:16px}
+.scpick button{text-align:left;border:2px solid var(--line);background:#fff;border-radius:12px;padding:9px 11px;color:var(--ink)}
+.scpick button:hover{border-color:#cdd2d8}
+.scpick button.on{border-color:var(--brand);background:var(--brand-soft)}
+.scpick b{display:block;font-size:14.5px}
+.scpick span{font-size:12px;color:var(--muted);line-height:1.3;display:block}
+
+/* ---------- tracker ---------- */
+table.trk{width:100%;border-collapse:collapse;font-size:14px}
+.trk th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:8px 12px;border-bottom:1px solid var(--line);background:#fbfbfc}
+.trk td{padding:10px 12px;border-bottom:1px solid #eef0f2;vertical-align:middle}
+.trk tr.hl td{background:#fff9fb}
+.trk .acts{display:flex;gap:6px}
+.flow{margin:16px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.flow .fh{display:flex;align-items:center;gap:8px;padding:9px 14px;background:var(--pa-soft);color:var(--pa);font-weight:600;font-size:13px}
+.fsteps{padding:6px 14px 12px}
+.fstep{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px dashed #e6e8eb;opacity:.45;transition:opacity .3s}
+.fstep:last-child{border-bottom:0}
+.fstep .n{width:26px;height:26px;border-radius:50%;border:2px solid #cfd4da;display:grid;place-items:center;font-size:12px;font-weight:700;color:var(--muted);background:#fff}
+.fstep .t{font-weight:600;font-size:14px}.fstep .d{font-size:13px;color:var(--muted)}
+.fstep .st{font-size:12px;color:var(--muted)}
+.fstep.run{opacity:1}.fstep.run .n{border-color:var(--pa);color:var(--pa);animation:pulse 1s infinite}
+.fstep.ok{opacity:1}.fstep.ok .n{background:var(--pos);border-color:var(--pos);color:#fff}
+.fstep.ok .st{color:var(--pos);font-weight:600}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(11,99,229,.35)}100%{box-shadow:0 0 0 8px rgba(11,99,229,0)}}
+.manual{display:flex;gap:16px;padding:0 16px 16px;font-size:13px}
+.manual div{flex:1;border-radius:10px;padding:10px 12px}
+.manual .m1{background:#f4f5f7}.manual .m2{background:var(--pos-soft);color:#14532d}
+
+/* ---------- calendar (closest open window) ---------- */
+.week{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:14px 16px 6px}
+.wd{border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;transition:all .3s;min-width:0}
+.wd b{display:block;font-size:14px}
+.wd .s{font-size:12px;color:var(--muted)}
+.wd.closed{background:#f4f5f7}
+.wd.scan{outline:2px solid var(--outlook);outline-offset:1px}
+.wd.skip{border-color:#e7a59d;background:var(--neg-soft)}
+.wd.skip .s{color:var(--neg)}
+.wd.pick{border-color:var(--pos);background:var(--pos-soft)}
+.wd.pick .s{color:#14532d;font-weight:600}
+.calwrap{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:14px;padding:8px 16px 16px}
+.cal3{display:grid;grid-template-columns:44px repeat(3,minmax(0,1fr));border:1px solid var(--line);border-radius:10px;overflow:hidden;min-width:0}
+.cal3 .chd{padding:7px 10px;font-weight:600;font-size:13px;border-bottom:1px solid var(--line);background:#fafbfc;border-left:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal3 .chd:first-child{border-left:0}
+.hours{position:relative}
+.hours span{position:absolute;left:6px;font-size:11px;color:var(--muted);transform:translateY(-7px);background:#fff;padding:0 2px}
+.dcol{position:relative;border-left:1px solid var(--line);transition:background .3s}
+.dcol.scan{background:#f3f8fe}
+.dcol .hl{position:absolute;left:0;right:0;border-top:1px solid #f0f1f3}
+.ev{position:absolute;left:4px;right:4px;border-radius:6px;padding:3px 7px;font-size:11.5px;overflow:hidden;line-height:1.25;transition:all .3s}
+.ev.busy{background:var(--outlook-soft);border-left:3px solid var(--outlook);color:#0b3d6e}
+.ev.free{border:1px dashed #cfd4da;color:var(--muted);background:#fff}
+.ev.free.no{border-color:#e7a59d;background:var(--neg-soft);color:var(--neg)}
+.ev.free.yes{border:2px solid var(--pos);background:var(--pos-soft);color:#14532d;font-weight:600}
+.ev.tiny{padding:0 6px;font-size:10px;line-height:1}
+.ev.ooo{background:repeating-linear-gradient(135deg,#fff,#fff 6px,#f1f2f4 6px,#f1f2f4 12px);border:1px solid var(--line);color:var(--ink2);font-weight:600}
+.ev.ooo.no{border-color:#e7a59d;color:var(--neg)}
+.before{position:absolute;left:0;right:0;top:0;background:rgba(242,243,245,.85);border-bottom:2px solid var(--brand)}
+.before span{position:absolute;right:4px;bottom:2px;font-size:10.5px;font-weight:700;color:var(--brand);background:#fff;border-radius:4px;padding:0 4px}
+.rules{border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:13px;align-self:start}
+.rules h4{margin:0 0 8px;font-size:13px}
+.rules ol{margin:0;padding-left:18px}.rules li{margin:4px 0}
+.result{margin-top:12px;border-radius:10px;padding:10px 12px;font-size:13px;background:var(--pos-soft);color:#14532d;display:none}
+.result.show{display:block;animation:fade .4s}
+.result.warn{background:var(--neu-soft);color:#5c4700}
+
+/* ---------- teams ---------- */
+.teams{display:grid;grid-template-columns:52px 210px minmax(0,1fr);grid-template-rows:minmax(0,1fr);height:calc(100vh - 190px);min-height:460px}
+.teams > *{min-height:0}
+.rail{background:#ebebf3;display:flex;flex-direction:column;align-items:center;gap:14px;padding:14px 0}
+.rail i{width:26px;height:26px;border-radius:7px;background:#d6d7ea;display:block}
+.rail i.on{background:var(--teams)}
+.clist{border-right:1px solid var(--line);background:#fafafd;overflow:auto}
+.clist h4{margin:0;padding:12px 14px;font-size:14px}
+.ci{display:flex;gap:9px;padding:9px 12px;font-size:13px;align-items:center}
+.ci.on{background:#fff;border-left:3px solid var(--teams);padding-left:9px}
+.av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;color:#fff;flex:none}
+.ci .nm{font-weight:600}.ci .pv{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
+.chat{display:flex;flex-direction:column;min-width:0;min-height:0;background:#f7f7fb}
+.lwin{height:calc(100vh - 190px);min-height:460px}
+.chat .ch{display:flex;align-items:center;gap:10px;padding:10px 16px;background:#fff;border-bottom:1px solid var(--line);font-size:14px}
+.chat .ch .app{font-size:11px;background:#eef0f3;border-radius:4px;padding:0 6px;color:var(--muted);height:auto}
+.msgs{padding:14px 18px;display:flex;flex-direction:column;gap:12px;overflow:auto;flex:1;min-height:0}
+.ts{text-align:center;font-size:12px;color:var(--muted)}
+.msg{display:flex;gap:10px;align-items:flex-start;max-width:640px;animation:fade .35s}
+.msg.me{align-self:flex-end;flex-direction:row-reverse}
+.bubble{background:#fff;border-radius:10px;padding:10px 12px;font-size:14px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.msg.me .bubble{background:#e8ebfa}
+.who{font-size:12px;color:var(--muted);margin-bottom:3px}
+.typing{display:inline-flex;gap:4px;padding:12px 14px}
+.typing span{width:7px;height:7px;border-radius:50%;background:#a3a6c9;animation:blink 1.2s infinite}
+.typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.3}40%{opacity:1}}
+.acard{background:#fff;border:1px solid #e1e2ee;border-radius:10px;overflow:hidden;width:100%;max-width:560px}
+.acard .ah{padding:12px 16px;border-bottom:1px solid #eeeef5}
+.acard .ah h3{margin:0;font-size:16px}
+.acard .ah p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.ctx{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#eeeef5;border-bottom:1px solid #eeeef5}
+.ctx div{background:#fafafe;padding:7px 12px;font-size:12px;color:var(--muted)}
+.ctx b{display:block;color:var(--ink);font-size:14px}
+.ab{padding:10px 16px 14px}
+.q{margin:10px 0}
+.q label,.q .ql{display:block;font-size:14px;font-weight:600;margin-bottom:5px}
+.q .ql em{font-weight:400;color:var(--muted);font-style:normal;font-size:12.5px}
+.stars{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.stars button{border:0;background:none;padding:2px;line-height:0;border-radius:6px}
+.stars svg{width:26px;height:26px}
+.stars .lab{font-size:12.5px;color:var(--muted);margin-left:8px}
+.stars.nums button{width:34px;height:30px;line-height:1;border:1px solid #d5d7e6;background:#fff;font-weight:600;font-size:14px;color:var(--ink2)}
+.stars.nums button.on{background:var(--teams);border-color:var(--teams);color:#fff}
+.stars.faces svg{width:30px;height:30px}
+.rstyle{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-top:6px;background:#fff}
+.rstyle button{border:0;border-left:1px solid var(--line);background:#fff;padding:4px 10px;font-size:13px;color:var(--ink2)}
+.rstyle button:first-child{border-left:0}
+.rstyle button.on{background:var(--teams);color:#fff;font-weight:600}
+.reasons{display:flex;flex-wrap:wrap;gap:6px}
+.reasons button{border:1px solid #d5d7e6;background:#fff;border-radius:999px;padding:4px 12px;font-size:13px}
+.reasons button.on{background:var(--teams);border-color:var(--teams);color:#fff}
+textarea{width:100%;min-height:74px;border:1px solid #d5d7e6;border-radius:8px;padding:8px 10px;font:inherit;font-size:14px;resize:vertical}
+.af{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-top:1px solid #eeeef5;background:#fafafe}
+.af .hint{font-size:12px;color:var(--muted)}
+.tbtn{background:var(--teams);color:#fff;border:0;border-radius:6px;padding:7px 18px;font-weight:600;font-size:14px}
+.tbtn:disabled{opacity:.4;cursor:default}
+.qr{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.qr button{border:1px solid var(--teams);color:var(--teams);background:#fff;border-radius:999px;padding:4px 12px;font-size:13px}
+.qr button:hover{background:var(--teams-soft)}
+.sent{font-size:13px}
+.sent .row{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.toast{position:absolute;right:14px;top:52px;width:330px;background:#fff;border:1px solid var(--line);border-left:4px solid var(--neg);border-radius:10px;padding:10px 28px 10px 12px;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.12);display:none;z-index:5}
+.toast.show{display:block;animation:slidein .4s}
+.toast.good{border-left-color:var(--pos)}
+.toast.mid{border-left-color:#e8a317}
+.toast b{display:block;margin-bottom:4px}
+.toast .x{position:absolute;right:8px;top:6px;border:0;background:none;color:var(--muted);font-size:16px}
+@keyframes slidein{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+
+/* ---------- AI analysis ---------- */
+.stages{padding:16px;display:grid;gap:12px}
+.stage{border:1px solid var(--line);border-radius:12px;opacity:.25;transition:opacity .4s}
+.stage.on{opacity:1}
+.stage .sh{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--line);font-weight:600;font-size:14px}
+.stage .sh .num{width:24px;height:24px;border-radius:50%;background:var(--ai);color:#fff;display:grid;place-items:center;font-size:12px}
+.stage .sb{padding:12px 14px;font-size:14px}
+.raw{color:var(--ink2)}
+.raw mark{background:var(--neg-soft);color:var(--neg);text-decoration:line-through;border-radius:3px;padding:0 2px}
+.clean mark{background:var(--pos-soft);color:var(--pos);border-radius:3px;padding:0 3px;font-weight:600}
+.arrow{font-size:12px;color:var(--muted);margin:8px 0 4px}
+.tags{display:flex;flex-wrap:wrap;gap:8px}
+.tagx{display:inline-flex;align-items:center;gap:6px;border-radius:8px;padding:5px 10px;font-size:13px;font-weight:600;border:1px solid}
+.tagx.neg{background:var(--neg-soft);color:var(--neg);border-color:#f1c3bc}
+.tagx.pos{background:var(--pos-soft);color:var(--pos);border-color:#b9e0c3}
+.tagx.neu{background:#f2f3f5;color:var(--ink2);border-color:#dfe2e6}
+.tagx small{font-weight:400;opacity:.85}
+.rec{width:100%;border-collapse:collapse;font-size:13.5px}
+.rec td{padding:6px 8px;border-bottom:1px solid #f0f1f3;vertical-align:top}
+.rec td:first-child{color:var(--muted);width:170px}
+details.prompt{margin:0 16px 16px;border:1px solid var(--line);border-radius:10px;background:#fbfaff}
+details.prompt summary{padding:9px 14px;cursor:pointer;font-weight:600;font-size:13.5px;color:var(--ai)}
+details.prompt pre{margin:0;padding:0 14px 14px;white-space:pre-wrap;font-family:Consolas,"Cascadia Mono",Menlo,monospace;font-size:12.5px;color:var(--ink2)}
+
+/* ---------- dashboard ---------- */
+.dash{padding:14px 16px 18px;display:grid;gap:14px}
+.filters{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px}
+.filters span{color:var(--muted);margin-right:4px}
+.filters button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 12px;font-size:13px}
+.filters button.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.kpi{border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.kpi .k{font-size:12.5px;color:var(--muted)}
+.kpi .v{font-size:28px;font-weight:700;line-height:1.15;font-variant-numeric:tabular-nums}
+.kpi .v small{font-size:14px;font-weight:600;color:var(--muted)}
+.kpi .s{font-size:12px;color:var(--muted)}
+.kpi .s.bad{color:var(--neg)}
+.panels{display:grid;grid-template-columns:1.25fr 1fr;gap:12px}
+.panel{border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0}
+.panel h4{margin:0 0 2px;font-size:14px}
+.panel .sub{font-size:12px;color:var(--muted);margin-bottom:8px}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--ink2);margin-bottom:4px}
+.legend i{display:inline-block;width:14px;height:2px;vertical-align:middle;margin-right:5px}
+svg text{font-family:inherit}
+.bars{display:grid;gap:7px}
+.brow{display:grid;grid-template-columns:150px 1fr 34px;gap:8px;align-items:center;font-size:13px}
+.btrack{height:14px;position:relative}
+.bfill{height:100%;border-radius:0 4px 4px 0;background:var(--brand);min-width:2px;transition:width .5s}
+.brow .bv{font-variant-numeric:tabular-nums;color:var(--ink2);text-align:right}
+table.dept{width:100%;border-collapse:collapse;font-size:13px}
+.dept th{text-align:left;font-weight:600;color:var(--muted);font-size:12px;padding:4px 6px;border-bottom:1px solid var(--line)}
+.dept td{padding:6px;border-bottom:1px solid #f0f1f3;white-space:nowrap}
+.dept tr.sel td{background:#fbf3f6}
+.dept .num{text-align:right;font-variant-numeric:tabular-nums}
+.newb{font-size:11px;background:var(--brand);color:#fff;border-radius:4px;padding:0 5px;margin-left:6px;font-weight:600}
+.insights{border:1px solid #dacffa;background:linear-gradient(180deg,#faf7ff,#fff);border-radius:12px;padding:12px 16px}
+.insights h4{margin:0 0 8px;font-size:14px;display:flex;align-items:center;gap:8px}
+.ins{display:grid;grid-template-columns:24px 1fr;gap:4px 10px;padding:8px 0;border-top:1px solid #eee8fb;font-size:13.5px}
+.ins:first-of-type{border-top:0}
+.ins .i{width:22px;height:22px;border-radius:50%;background:var(--ai-soft);color:var(--ai);display:grid;place-items:center;font-weight:700;font-size:12px}
+.ins .rec2{grid-column:2;color:var(--ai);font-weight:600}
+.insights .ft{font-size:12px;color:var(--muted);margin-top:6px}
+.ask{border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.ask h4{margin:0 0 8px;font-size:14px}
+.askq{display:flex;flex-wrap:wrap;gap:6px}
+.askq button{border:1px solid #d9cff8;background:#fff;color:var(--ai);border-radius:999px;padding:4px 12px;font-size:13px}
+.askq button:hover{background:var(--ai-soft)}
+.askans{margin-top:10px;font-size:14px;background:#faf8ff;border-radius:10px;padding:10px 12px;display:none}
+.askans.show{display:block;animation:fade .3s}
+.tip{position:fixed;pointer-events:none;background:#1d2127;color:#fff;font-size:12px;border-radius:6px;padding:6px 9px;z-index:50;display:none;max-width:220px;line-height:1.35}
+.tip b{font-weight:600}
+
+/* ---------- loop ---------- */
+.checks{display:grid;gap:8px;margin:8px 0}
+.checks label{display:flex;gap:9px;align-items:flex-start;font-size:14px;border:1px solid #e6e7f1;border-radius:8px;padding:8px 10px;cursor:pointer}
+.checks input{margin-top:3px;accent-color:var(--teams)}
+.checks small{display:block;color:var(--muted);font-size:12.5px}
+.ysw{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#eeeef5;border-radius:8px;overflow:hidden;font-size:13px;margin-top:8px}
+.ysw div{background:#fff;padding:8px 10px}
+.ysw .h{background:#f6f6fb;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+
+/* ---------- summary ---------- */
+.sumhead{display:flex;justify-content:space-between;align-items:end;margin-bottom:14px;gap:20px;flex-wrap:wrap}
+.sumhead h2{margin:0;font-size:28px}
+.sumhead p{margin:4px 0 0;color:var(--ink2)}
+.sumgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.scard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;border-top:5px solid}
+.scard h3{margin:0 0 4px;font-size:17px}
+.scard .claim{margin:0 0 8px;font-size:14px;color:var(--ink2);font-style:italic}
+.scard ul{margin:0;padding-left:18px;font-size:14px;color:var(--ink2)}.scard li{margin:4px 0}
+.sumrow{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:14px;margin-top:14px}
+.sbox{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;font-size:14px;min-width:0}
+.sbox h4{margin:0 0 10px;font-size:15px}
+.nums3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.nums3 div{background:#f6f7f9;border-radius:10px;padding:10px 12px}
+.nums3 b{display:block;font-size:26px;color:var(--brand);line-height:1.1;font-variant-numeric:tabular-nums}
+.nums3 span{font-size:12.5px;color:var(--ink2)}
+.invest{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.invest div{background:var(--brand-soft);border-radius:10px;padding:10px 12px}
+.invest b{display:block;font-size:24px;color:var(--brand-dark);font-variant-numeric:tabular-nums}
+.invest span{font-size:12.5px;color:var(--ink2)}
+.sbox .fine{font-size:12.5px;color:var(--muted);margin:10px 0 0}
+.quote{margin:18px auto 4px;max-width:760px;text-align:center;font-size:17px;font-style:italic;color:var(--ink2)}
+
+/* ---------- scenarios switch ---------- */
+.foot-left{display:flex;align-items:center;gap:10px}
+.scswitch{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:13px;background:#fff}
+.scswitch span{padding:0 10px;color:var(--muted)}
+.scswitch button{border:0;border-left:1px solid var(--line);background:#fff;padding:7px 11px;font-size:13px;color:var(--ink2);white-space:nowrap}
+.scswitch button.on{background:var(--ink);color:#fff;font-weight:600}
+
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* ---------- responsive ---------- */
+@media (max-width:1100px){
+  .scene{grid-template-columns:minmax(0,1fr)}
+  .narr{position:static}
+  .hero{grid-template-columns:1fr}
+  .panels,.sumrow{grid-template-columns:1fr}
+  .calwrap{grid-template-columns:1fr}
+}
+@media (max-width:760px){
+  main{padding:12px 16px}
+  .teams{grid-template-columns:minmax(0,1fr)}
+  .rail,.clist{display:none}
+  .kpis{grid-template-columns:1fr 1fr}
+  .sumgrid{grid-template-columns:1fr}
+  .week{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ctx{grid-template-columns:1fr 1fr}
+  .brow{grid-template-columns:110px 1fr 34px}
+  .pg{grid-template-columns:1fr}
+  .hero{padding:22px}
+  .hero h1{font-size:30px}
+  table.trk{font-size:12.5px}
+  .trk td,.trk th{padding:8px 6px}
+  nav.steps{display:none}
+  .scswitch span{display:none}
+  footer .caption{display:none}
+  .scpick{grid-template-columns:1fr}
+  .nums3,.invest{grid-template-columns:1fr}
+  .cal3{grid-template-columns:36px repeat(3,minmax(0,1fr))}
+  footer.bottom{flex-wrap:wrap;gap:8px}
+  .foot-left{display:contents}
+  .scswitch{order:-1;width:100%}
+  .scswitch button{flex:1;padding:6px 4px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top">
+  <div class="logo">
+    <div class="mark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><polyline points="8.5 12.5 11 15 15.5 9.5"/></svg></div>
+    <div>QuickbackAI<small>AI-powered hiring manager feedback · Team 2 prototype</small></div>
+  </div>
+  <nav class="steps" id="nav"></nav>
+  <div class="top-actions">
+    <button class="btn small" id="resetBtn" title="Start the demo again from the beginning">Reset</button>
+    <button class="btn small" id="fsBtn" title="Full screen (F)">Full screen</button>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ================= INTRO ================= -->
+<section class="scene full" data-scene="intro">
+  <div class="hero">
+    <div>
+      <div class="kick">Business Intelligence Program 2026 · Team 2</div>
+      <h1>Closing the feedback loop in recruitment with <span>AI</span></h1>
+      <p class="lead">When a hiring process closes, the hiring manager automatically gets a one-minute card in Teams. AI turns the answers into concrete actions for HR.</p>
+      <div class="pg">
+        <div class="today"><b>Today</b>Feedback happens only in conversations, e-mails and ad hoc chats. It is informal, gets lost or isn’t complete, so the same problems repeat.</div>
+        <div class="goal"><b>With QuickbackAI</b>A trigger event starts everything, managers answer in about a minute, and AI suggests what to change before the next search.</div>
+      </div>
+      <button class="btn primary" data-go="1">Start the demo →</button>
+      <div class="keys">Tip: use <kbd>→</kbd> and <kbd>←</kbd> to move between steps, <kbd>F</kbd> for full screen.</div>
+    </div>
+    <div class="scenario">
+      <h3>Choose a demo scenario</h3>
+      <div class="scpick" id="scPick"></div>
+      <dl class="facts" id="scFacts"></dl>
+      <p style="font-size:13px;color:var(--muted);margin:14px 0 0">All people, numbers and screens in this demo are fictional. Screens are simplified look-alikes of Microsoft 365 tools.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 1 TRIGGER ================= -->
+<section class="scene" data-scene="trigger">
+  <aside class="narr">
+    <span class="tag">Step 1 · Automation</span>
+    <h2>A trigger event starts everything</h2>
+    <div id="narr1"></div>
+    <div class="try" id="try1"></div>
+    <div class="chips"><span class="lbl">Built with</span><span class="chip c-pa">Power Automate</span><span class="chip c-sp">SharePoint / ATS (SAP)</span></div>
+  </aside>
+  <div class="screen">
+    <div class="bar"><span class="dot" style="background:var(--sp)"></span><b>Recruitment tracker</b> · ATS (SAP), synced to SharePoint<span class="sim">simulated</span></div>
+    <div style="overflow-x:auto"><table class="trk" id="trk"></table></div>
+    <div class="flow">
+      <div class="fh"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Power Automate flow · “QuickbackAI feedback”</div>
+      <div class="fsteps" id="flowSteps"></div>
+    </div>
+    <div class="manual">
+      <div class="m1"><b>Recruiter effort:</b> nothing extra (they update the tracker anyway)</div>
+      <div class="m2"><b>Automatic:</b> facts, timing, sending, reminder, AI analysis</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 2 TIMING ================= -->
+<section class="scene" data-scene="timing">
+  <aside class="narr">
+    <span class="tag">Step 2 · Good experience</span>
+    <h2>Smart timing with Outlook</h2>
+    <p id="narr2"></p>
+    <ul>
+      <li>Starts right after the trigger event</li>
+      <li>Needs at least 30 free minutes</li>
+      <li>Out-of-office days count as busy</li>
+      <li>No open window within 3 days → the card is sent anyway</li>
+    </ul>
+    <button class="btn primary" id="findSlotBtn">Find the closest open window</button>
+    <div class="chips"><span class="lbl">Built with</span><span class="chip c-outlook">Outlook calendar</span><span class="chip c-pa">Power Automate</span></div>
+  </aside>
+  <div class="screen">
+    <div class="bar"><span class="dot" style="background:var(--outlook)"></span><b>Outlook calendar</b> · <span id="bar2"></span><span class="sim">simulated</span></div>
+    <div class="week" id="week"></div>
+    <div class="calwrap">
+      <div class="cal3" id="cal3"></div>
+      <div>
+        <div class="rules">
+          <h4>What the flow checks</h4>
+          <ol id="ruleLog"><li style="color:var(--muted);list-style:none;margin-left:-18px">Press “Find the closest open window”.</li></ol>
+        </div>
+        <div class="result" id="slotResult"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 3 CARD ================= -->
+<section class="scene" data-scene="card">
+  <aside class="narr">
+    <span class="tag">Step 3 · Good experience</span>
+    <h2>A one-minute card in Teams</h2>
+    <div id="narr3"></div>
+    <div class="try"><b>Try it:</b> fill in the card yourself, or <button class="btn small" id="autofillBtn" style="margin-top:6px">Fill demo answers</button></div>
+    <div style="font-size:13px;color:var(--ink2)"><b>Rating scale</b> (can be tweaked to the company’s needs)<br><span class="rstyle" id="rstyle"><button type="button" data-rs="stars" class="on">Stars</button><button type="button" data-rs="nums">1–5</button><button type="button" data-rs="faces">Faces</button></span></div>
+    <div class="chips"><span class="lbl">Built with</span><span class="chip c-teams">Teams Adaptive Card</span><span class="chip c-ai">Copilot</span></div>
+  </aside>
+  <div class="screen">
+    <div class="bar"><span class="dot" style="background:var(--teams)"></span><b>Microsoft Teams</b> · <span id="bar3"></span><span class="sim">simulated</span></div>
+    <div class="teams">
+      <div class="rail"><i></i><i class="on"></i><i></i><i></i><i></i></div>
+      <div class="clist">
+        <h4>Chat</h4><div id="clist"></div>
+      </div>
+      <div class="chat">
+        <div class="ch"><div class="av" style="background:var(--brand);width:26px;height:26px;font-size:11px">QB</div><b>QuickbackAI</b><span class="app">App</span></div>
+        <div class="msgs" id="msgs"></div>
+      </div>
+    </div>
+    <div class="toast" id="toast"></div>
+  </div>
+</section>
+
+<!-- ================= 4 AI ================= -->
+<section class="scene" data-scene="ai">
+  <aside class="narr">
+    <span class="tag">Step 4 · Actionable insights</span>
+    <h2>AI analysis</h2>
+    <p>Copilot removes names, tags the topics and their tone, and gives each answer a one-sentence summary. Nobody reads and sorts comments by hand.</p>
+    <ul>
+      <li>Names are removed before anything is stored</li>
+      <li>Fixed topic list, so results can be counted</li>
+      <li>One-sentence summary per answer</li>
+    </ul>
+    <button class="btn" id="replayAi">Replay the analysis</button>
+    <div class="note">In this demo the AI step is simulated with simple rules. In the real solution it is a Copilot prompt inside the Power Automate flow. The prompt is shown below the analysis.</div>
+    <div class="chips"><span class="lbl">Built with</span><span class="chip c-ai">Copilot</span><span class="chip c-pa">Power Automate</span></div>
+  </aside>
+  <div class="screen">
+    <div class="bar"><span class="dot" style="background:var(--ai)"></span><b>AI processing</b> · Power Automate + Copilot<span class="sim">simulated</span></div>
+    <div class="stages">
+      <div class="stage" id="st1"><div class="sh"><span class="num">1</span>Remove personal data</div><div class="sb" id="st1b"></div></div>
+      <div class="stage" id="st2"><div class="sh"><span class="num">2</span>Tag topics and tone</div><div class="sb" id="st2b"></div></div>
+      <div class="stage" id="st3"><div class="sh"><span class="num">3</span>Save one structured record with a summary</div><div class="sb" id="st3b"></div></div>
+    </div>
+    <details class="prompt"><summary>See the Copilot prompt used in the flow</summary><pre id="promptText"></pre></details>
+  </div>
+</section>
+
+<!-- ================= 5 INSIGHTS ================= -->
+<section class="scene" data-scene="dash">
+  <aside class="narr">
+    <span class="tag">Step 5 · Insights and actions</span>
+    <h2>Dashboard and monthly summary</h2>
+    <p>Every answer lands in one place. HR sees satisfaction over time, the most common problems and why searches fail.</p>
+    <p>Once a month Copilot writes a short summary with the top issues and recommended actions. HR checks it before sharing.</p>
+    <div class="try" id="try5"></div>
+    <div class="note">Results are shown per department, not per person.</div>
+    <div class="chips"><span class="lbl">Built with</span><span class="chip c-pbi">Power BI</span><span class="chip c-ai">Copilot Studio</span></div>
+  </aside>
+  <div class="screen">
+    <div class="bar"><span class="dot" style="background:#e8b500"></span><b>Hiring manager feedback</b> · Power BI · Jun–Nov 2026<span class="sim">simulated data</span></div>
+    <div class="dash">
+      <div class="filters" id="filters"></div>
+      <div class="kpis" id="kpis"></div>
+      <div class="panels">
+        <div class="panel">
+          <h4>Hiring manager satisfaction</h4>
+          <div class="sub">Average overall score (1–5) per month</div>
+          <div class="legend" id="trendLegend"></div>
+          <div id="trend"></div>
+          <h4 style="margin-top:12px">What managers praise</h4>
+          <div class="sub">Topics found by AI in positive feedback</div>
+          <div class="bars" id="praise"></div>
+        </div>
+        <div class="panel">
+          <h4>Most common problems</h4>
+          <div class="sub">Topics found by AI in negative feedback</div>
+          <div class="bars" id="topics"></div>
+          <h4 style="margin-top:14px">Why searches ended without a hire</h4>
+          <div class="sub">Reasons ticked by managers (more than one allowed)</div>
+          <div class="bars" id="reasons"></div>
+        </div>
+      </div>
+      <div class="panels">
+        <div class="insights" id="insights"></div>
+        <div style="display:grid;gap:12px;align-content:start">
+          <div class="panel">
+            <h4>By department</h4>
+            <table class="dept" id="deptTable"></table>
+          </div>
+          <div class="ask">
+            <h4>Ask the data (Copilot Studio)</h4>
+            <div class="askq" id="askq"></div>
+            <div class="askans" id="askans"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 6 LESSONS ================= -->
+<section class="scene" data-scene="loop">
+  <aside class="narr">
+    <div id="narr6"></div>
+    <div class="chips"><span class="lbl">Built with</span><span class="chip c-pa">Power Automate</span><span class="chip c-ai">Copilot</span><span class="chip c-teams">Teams</span></div>
+  </aside>
+  <div class="screen">
+    <div class="bar"><span class="dot" style="background:var(--teams)"></span><b>Microsoft Teams</b> · <span id="bar6"></span><span class="sim">simulated</span></div>
+    <div class="chat lwin">
+      <div class="msgs" id="loopMsgs"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SUMMARY ================= -->
+<section class="scene full" data-scene="sum">
+  <div class="sumhead">
+    <div><h2>QuickbackAI in one picture</h2><p>An automatic trigger, a one-minute Teams card, AI analysis, a dashboard and concrete actions, all in Microsoft 365.</p></div>
+    <button class="btn" data-go="0">↺ Back to start</button>
+  </div>
+  <div class="sumgrid">
+    <div class="scard" style="border-top-color:#f0a000"><h3>Automation</h3><p class="claim">A trigger event starts everything. Recruiters do nothing extra.</p><ul>
+      <li>Closing a position starts the flow</li><li>Positions that never close: asked after each hire</li><li>Closest open window in Outlook</li><li>No window within 3 days: sent anyway</li></ul></div>
+    <div class="scard" style="border-top-color:var(--brand)"><h3>Good experience</h3><p class="claim">About one minute, inside Teams, with questions that fit the outcome.</p><ul>
+      <li>3 ratings and 1 tailored question</li><li>Rating scale can be tweaked</li><li>Facts pre-filled from the tracker</li><li>At most one smart follow-up</li></ul></div>
+    <div class="scard" style="border-top-color:#5fae2e"><h3>Actionable insights</h3><p class="claim">AI finds patterns and suggests what to change before the next search.</p><ul>
+      <li>Names removed, topics and tone tagged</li><li>AI summary of every answer for the recruiter</li><li>Dashboard and monthly Copilot summary</li><li>Lessons for the next search</li></ul></div>
+  </div>
+  <div class="sumrow">
+    <div class="sbox"><h4>In numbers</h4>
+      <div class="nums3"><div><b>≈ 1 min</b><span>for the hiring manager, inside Teams</span></div><div><b>0</b><span>extra steps for recruiters</span></div><div><b>≈ 250</b><span>feedback answers per year</span></div></div>
+    </div>
+    <div class="sbox"><h4>Built with</h4>
+      <div class="chips" style="margin-top:0"><span class="chip c-pa">Power Automate</span><span class="chip c-sp">SharePoint / ATS (SAP)</span><span class="chip c-outlook">Outlook calendar</span><span class="chip c-teams">Teams Adaptive Card</span><span class="chip c-ai">Copilot</span><span class="chip c-ai">Copilot Studio</span><span class="chip c-pbi">Power BI</span></div>
+    </div>
+    <div class="sbox"><h4>Project investment</h4>
+      <div class="invest"><div><b>~€10.6k</b><span>upfront</span></div><div><b>~€4.1k</b><span>per year</span></div></div>
+      <p class="fine">Approximate Microsoft list prices, excl. VAT. Some licences may already be in innogy’s agreement.</p>
+    </div>
+  </div>
+  <p class="quote">„Constructive criticism is the key to growth and success. Through feedback, we learn, improve, and make our work better.”</p>
+</section>
+
+</main>
+
+<footer class="bottom">
+  <div class="foot-left"><button class="btn" id="prevBtn">← Back</button><div class="scswitch" id="scSwitch" title="Switch the demo scenario"><span>Scenario</span><button type="button" data-sc="nohire">Not filled</button><button type="button" data-sc="filled">Filled</button><button type="button" data-sc="always">Never closes</button></div></div>
+  <div class="caption" id="caption"></div>
+  <button class="btn primary" id="nextBtn">Next →</button>
+</footer>
+</div>
+<div class="tip" id="tip"></div>
+<script>
+(function(){
+'use strict';
+var $ = function(s){ return document.querySelector(s); };
+var $$ = function(s){ return Array.prototype.slice.call(document.querySelectorAll(s)); };
+function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function fmt1(x){ return (x === null || x === undefined) ? '–' : (Math.round(x*10)/10).toFixed(1); }
+function avg(a){ return a.length ? a.reduce(function(s,x){return s+x;},0)/a.length : null; }
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+function byOrder(order){ return function(x,y){ return order.indexOf(x)-order.indexOf(y); }; }
+
+var SPARK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.2 6.3L20.5 10.5l-6.3 2.2L12 19l-2.2-6.3L3.5 10.5l6.3-2.2z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg>';
+var CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+var STAR = 'M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.2 6.6L12 17.4 6.2 20.6l1.2-6.6L2.5 9.4l6.6-.8z';
+
+/* ================= constants ================= */
+var STEPS = [
+  {id:'intro',  label:'Start',          cap:'Introduction and demo scenario'},
+  {id:'trigger',label:'1 Trigger',      cap:'A trigger event starts the flow'},
+  {id:'timing', label:'2 Smart timing', cap:'Outlook finds the closest open window'},
+  {id:'card',   label:'3 Teams card',   cap:'The hiring manager answers in Teams in about a minute'},
+  {id:'ai',     label:'4 AI analysis',  cap:'Copilot removes names, tags topics and tone, writes a summary'},
+  {id:'dash',   label:'5 Insights',     cap:'Dashboard, monthly Copilot summary and alerts'},
+  {id:'loop',   label:'6 Lessons',      cap:''},
+  {id:'sum',    label:'Summary',        cap:'Automation · good experience · actionable insights'}
+];
+var TOPICS = {S:'Salary', K:'Skills availability', Q:'Candidate quality', P:'Process speed', C:'Communication', J:'Job description'};
+var TOPIC_ORDER = ['S','K','Q','P','C','J'];
+var RATING_LABEL = ['', 'Very poor', 'Poor', 'OK', 'Good', 'Excellent'];
+var POS_CHIPS = {P:'Fast process', Q:'Strong shortlist', C:'Clear communication', J:'Good job ad', O:'Smooth offer'};
+var T1040 = 10 + 40/60;
+
+/* ================= the three scenarios ================= */
+var SCENARIOS = {
+  nohire: {
+    key:'nohire', filled:false, pickTitle:'Not filled', pickSub:'Data Analyst · IT · 74 days',
+    role:'Data Analyst', dept:'IT', mgr:'Martin Novák', mgrFirst:'Martin', mgrInit:'MN', mgrColor:'#4b5563', rec:'Eva Svobodová',
+    days:74, applicants:38, interviews:6,
+    actPrefix:'Close as:', closeBtn:'Not filled', statusClosed:'Closed – not filled', cardPlanned:'Card planned · Wed 13:00',
+    outcomePill:'<span class="pill p-neg">Closed without a hire</span>',
+    facts:[['Position','Data Analyst'],['Department','IT'],['Hiring manager','Martin Novák'],['Recruiter','Eva Svobodová'],['Open since','3 Sep 2026 (74 days)'],['Pipeline','38 applicants · 6 interviews']],
+    narr1:'<p>The recruiter closes the position in the tracker, as they already do today. That is the only manual step.</p><p>A Power Automate flow notices the change, collects the facts and plans the feedback request.</p>',
+    try1:'<b>Try it:</b> click <b>Not filled</b> on the Data Analyst row.',
+    flow:[
+      ['When the status changes to “Closed”', 'Data Analyst (IT) → Closed – not filled · Mon 16 Nov, 10:40', 'Triggered'],
+      ['Get the facts from the tracker', '74 days open · 38 applicants · 6 interviews · recruiter Eva Svobodová', 'Done'],
+      ['Find the closest open window in Outlook', 'Starts right away, sent anyway after 3 days without a window → Wed 18 Nov, 13:00', 'Done'],
+      ['Send the Teams card', 'One automatic reminder if there is no answer', 'Scheduled']],
+    narr2:'Right after closing, the flow looks for Martin’s closest open window in Outlook, so the card doesn’t land in the middle of a meeting.',
+    closeLabel:'Closed 10:40',
+    week:[{d:'Mon 16 Nov', s:'Position closed 10:40', v:[2,'skip','No open window']}, {d:'Tue 17 Nov', s:'Training', v:[3,'skip','Out of office']},
+          {d:'Wed 18 Nov', s:'Normal day', v:[4,'pick','Send at 13:00']}, {d:'Thu 19 Nov', s:'Normal day'}],
+    dayScan:[2,3,4],
+    cal:[
+      {label:'Mon 16 Nov', ev:[{s:8.5,e:9,t:'Daily stand-up'},{s:9,e:10.5,t:'Sprint planning'},{s:T1040,e:11,free:true,v:[2,'no','20 min · too short']},
+        {s:11,e:12,t:'Vendor workshop'},{s:12,e:12.5,t:'Lunch'},{s:12.5,e:14,t:'Steering committee'},{s:14,e:14.25,free:true,v:[2,'no','15 min · too short']},
+        {s:14.25,e:16,t:'Budget review'},{s:16,e:17,t:'1:1 with Jakub'}]},
+      {label:'Tue 17 Nov', ev:[{s:8,e:17,ooo:true,t:'Out of office · training',v:[3,'no','Out of office · skipped']}]},
+      {label:'Wed 18 Nov', ev:[{s:8,e:9,t:'Stand-up and mail'},{s:9,e:12,t:'Architecture workshop'},{s:12,e:12.5,t:'Lunch'},{s:12.5,e:13,t:'Team retro'},
+        {s:13,e:14,free:true,v:[4,'yes','✓ send the Teams card']},{s:14,e:15.5,t:'Budget review'},{s:15.5,e:17,free:true}]}],
+    log:['Position closed <b>Mon 16 Nov, 10:40</b> → start looking right away',
+         'Mon: only 20 and 15 free minutes → too short',
+         'Tue: Martin is <b>out of office</b> → skip',
+         'Wed 13:00: 60 free minutes → <b>pick this</b>',
+         'One reminder planned for Fri 20 Nov, only if there’s no answer'],
+    slotResult:'<b>'+CHECK+' Teams card scheduled: Wednesday 18 Nov, 13:00.</b><br>The closest open window after closing, within the 3-day limit.', slotWarn:false,
+    ts:'Wednesday 18 November · 13:00', t1:'13:00', t2:'13:01',
+    cardTitle:'How did the Data Analyst search go?',
+    cardIntro:'Hi Martin, the position was closed without a hire. Your view helps us do better next time. It takes about a minute.',
+    ctx:[['Position','Data Analyst'],['Days open','74'],['Outcome','Not filled'],['Applicants','38'],['Interviews','6'],['Recruiter','Eva Svobodová']],
+    chipQ:'Why do you think we didn’t find the right person?', chipTone:'neg', chipOrder:['S','K','J','P','O'],
+    chips:{S:'Salary expectations', K:'Skills not available on the market', J:'Job description unclear', P:'Process too slow', O:'Other'},
+    commentQ:'What should we do differently next time?',
+    defaults:{overall:2, quality:2, comm:4, reasons:['S','K','P'],
+      comment:'Two candidates were good – Petr Dvořák had strong SQL – but he wanted about 25% more than our salary range. The others lacked Power BI experience. The process also took too long and we lost one candidate to another offer.'},
+    defFollow:{q:'You rated candidate quality 2/5. What was missing most?', a:'Key technical skills'},
+    chats:[['QB','var(--brand)','QuickbackAI','How did the Data Analyst search go?'],['ES','#0f7b6c','Eva Svobodová','Thanks for the interviews!'],['IT','#8a5a00','IT leadership','Budget review moved to 14:00'],['JK','#4b5563','Jakub Kříž','See you at 16:00']],
+    narr3:'<p>At the closest open window after closing, Martin gets a card in Teams. The facts are pre-filled, so he only gives his opinion: 3 ratings and 1 question that fits the outcome.</p><p>After he sends it:</p><ul><li>Copilot asks <b>one</b> smart follow-up question</li><li>The recruiter gets an AI summary of the answer, and a low score is flagged</li></ul>',
+    sentLine:'Data Analyst (IT) · not filled after 74 days', outcomeLine:'Not filled after 74 days',
+    try5:'<b>Try it:</b> filter by <b>IT</b>, hover over the charts, or ask the data a question.',
+    narr6:'<span class="tag">Step 6 · Closing the loop</span><h2>Lessons for the next search</h2><p>Two weeks later, IT opens the Data Analyst role again. Before the kick-off, the recruiter and the manager automatically get what went wrong last time and suggested fixes.</p><p>Every quarter, all hiring managers get a short “You said, we did” update, so they see that their feedback changes something.</p><div class="try"><b>Try it:</b> tick the actions and add them to the kick-off.</div>',
+    bar6:'Kick-off: Data Analyst (IT), 2nd round', cap6:'Lessons for the next search'
+  },
+  filled: {
+    key:'filled', filled:true, pickTitle:'Filled', pickSub:'Customer Care Specialist · Customer care · 45 days',
+    role:'Customer Care Specialist', dept:'Customer care', mgr:'Jana Veselá', mgrFirst:'Jana', mgrInit:'JV', mgrColor:'#0e7490', rec:'Pavel Horák',
+    days:45, applicants:52, interviews:5,
+    actPrefix:'Close as:', closeBtn:'Filled', statusClosed:'Closed – filled', cardPlanned:'Card planned · Mon 14:30',
+    outcomePill:'<span class="pill p-pos">Filled · offer accepted</span>',
+    facts:[['Position','Customer Care Specialist'],['Department','Customer care'],['Hiring manager','Jana Veselá'],['Recruiter','Pavel Horák'],['Open since','2 Oct 2026 (45 days)'],['Pipeline','52 applicants · 5 interviews'],['Start date','4 Jan 2027']],
+    narr1:'<p>The recruiter closes the position in the tracker, as they already do today. That is the only manual step.</p><p>A Power Automate flow notices the change, collects the facts and plans the feedback request.</p>',
+    try1:'<b>Try it:</b> click <b>Filled</b> on the Customer Care Specialist row.',
+    flow:[
+      ['When the status changes to “Closed”', 'Customer Care Specialist (Customer care) → Closed – filled · Mon 16 Nov, 10:40', 'Triggered'],
+      ['Get the facts from the tracker', '45 days open · 52 applicants · 5 interviews · recruiter Pavel Horák', 'Done'],
+      ['Find the closest open window in Outlook', 'Starts right away, sent anyway after 3 days without a window → Mon 16 Nov, 14:30', 'Done'],
+      ['Send the Teams card', 'One automatic reminder if there is no answer', 'Scheduled']],
+    narr2:'Right after closing, the flow looks for Jana’s closest open window in Outlook. She has a free hour the same afternoon.',
+    closeLabel:'Closed 10:40',
+    week:[{d:'Mon 16 Nov', s:'Position closed 10:40', v:[3,'pick','Send at 14:30']}, {d:'Tue 17 Nov', s:'Not needed'}, {d:'Wed 18 Nov', s:'Not needed'}, {d:'Thu 19 Nov', s:'Not needed'}],
+    dayScan:[2,null,null],
+    cal:[
+      {label:'Mon 16 Nov', ev:[{s:8,e:9.5,t:'Team huddle'},{s:9.5,e:11.5,t:'Shift planning'},{s:11.5,e:11.75,free:true,v:[2,'no','15 min · too short']},
+        {s:11.75,e:12.5,t:'Escalation review'},{s:12.5,e:13,t:'Lunch'},{s:13,e:14.5,t:'Customer feedback workshop'},
+        {s:14.5,e:15.5,free:true,v:[3,'yes','✓ send the Teams card']},{s:15.5,e:16.5,t:'1:1 with Petra'},{s:16.5,e:17,free:true}]},
+      {label:'Tue 17 Nov', ev:[{s:8,e:9,t:'Team huddle'},{s:9,e:12,t:'Agent coaching'},{s:12,e:12.5,t:'Lunch'},{s:13,e:15,t:'Quality review'}]},
+      {label:'Wed 18 Nov', ev:[{s:8,e:9,t:'Team huddle'},{s:10,e:11,t:'Vendor call'},{s:13,e:16,t:'Training of new agents'}]}],
+    log:['Position closed <b>Mon 16 Nov, 10:40</b> → start looking right away',
+         'Mon 11:30: only 15 free minutes → too short',
+         'Mon 14:30: 60 free minutes → <b>pick this</b>',
+         'Same day, about 4 hours after closing',
+         'One reminder planned for Thu 19 Nov, only if there’s no answer'],
+    slotResult:'<b>'+CHECK+' Teams card scheduled: Monday 16 Nov, 14:30.</b><br>The same day, while the search is still fresh.', slotWarn:false,
+    ts:'Monday 16 November · 14:30', t1:'14:30', t2:'14:31',
+    cardTitle:'How did the Customer Care Specialist search go?',
+    cardIntro:'Hi Jana, congratulations on your new colleague! Your view helps us repeat what worked. It takes about a minute.',
+    ctx:[['Position','Customer Care Specialist'],['Days open','45'],['Outcome','Filled'],['Applicants','52'],['Interviews','5'],['Recruiter','Pavel Horák']],
+    chipQ:'What worked well?', chipTone:'pos', chipOrder:['P','Q','C','J','O'], chips:POS_CHIPS,
+    commentQ:'What could we do even better next time?',
+    defaults:{overall:4, quality:5, comm:5, reasons:['P','Q','C'],
+      comment:'Pavel Horák sent three really strong candidates within two weeks and kept me updated. One thing to improve: the job ad didn\'t mention shift work, so two candidates dropped out late.'},
+    defFollow:{q:'Great result! What helped most this time?', a:'Strong shortlist'},
+    chats:[['QB','var(--brand)','QuickbackAI','How did the Customer Care Specialist search go?'],['PH','#0f7b6c','Pavel Horák','The offer was accepted!'],['CC','#8a5a00','Customer care leads','December shift plan is out'],['PŠ','#4b5563','Petra Šimková','See you at 15:30']],
+    narr3:'<p>A few hours after closing, at the closest open window, Jana gets a card in Teams. The facts are pre-filled, so she only gives her opinion. Because the hire worked out, the card asks what went well, so it can be repeated.</p><p>After she sends it:</p><ul><li>Copilot asks <b>one</b> smart follow-up question</li><li>The recruiter gets an AI summary, including what went well</li></ul>',
+    sentLine:'Customer Care Specialist (Customer care) · filled after 45 days', outcomeLine:'Filled after 45 days',
+    try5:'<b>Try it:</b> filter by <b>Customer care</b>, hover over the charts, or ask the data a question.',
+    narr6:'<span class="tag">Step 6 · Closing the loop</span><h2>Check the hire, reuse what worked</h2><p>Three months after the start date, Jana gets one more question: did the hire turn out as expected?</p><p>When Customer care opens two more similar roles, the recruiter and the manager automatically get what worked last time, plus the one thing to fix.</p><div class="try"><b>Try it:</b> answer the 90-day check, then add the actions to the kick-off.</div>',
+    bar6:'Jana Veselá · 90-day check and new kick-off', cap6:'What worked is reused for the next search',
+    loop:{ts1:'Monday 5 April 2027 · 10:00 · 3 months after the start date',
+      ts2:'Wednesday 14 April 2027 · 09:00 · Customer care opens 2 more Customer Care Specialist roles',
+      title:'Before you start: what worked last time', forLine:'For Pavel Horák and Jana Veselá · Customer Care Specialist, 2 new roles',
+      last:['Last search','45 days'], hint:'Sent automatically when the new roles were opened', ysw:'April 2027'}
+  },
+  always: {
+    key:'always', filled:true, pickTitle:'Never closes', pickSub:'Grid Technician · always open · asks after each hire',
+    role:'Grid Technician', dept:'Grid operations', mgr:'Tomáš Beneš', mgrFirst:'Tomáš', mgrInit:'TB', mgrColor:'#6b4f1d', rec:'Lenka Marková',
+    days:34, applicants:14, interviews:4,
+    actPrefix:'Event:', closeBtn:'Record hire', statusClosed:'Open · hire #6 recorded', cardPlanned:'Card planned · Thu 08:00',
+    outcomePill:'<span class="pill p-blue">Hire #6 · position stays open</span>',
+    facts:[['Position','Grid Technician'],['Department','Grid operations'],['Hiring manager','Tomáš Beneš'],['Recruiter','Lenka Marková'],['Status','Always open, never formally closed'],['This hire','#6 in 2026, 34 days to hire'],['Pipeline','14 applicants · 4 interviews']],
+    narr1:'<p>This position is always open and never formally closed. So QuickbackAI doesn’t wait for a closing date: it asks after each hire.</p><p>When the recruiter marks a candidate as hired, the flow starts, just as it does when a position closes.</p>',
+    try1:'<b>Try it:</b> click <b>Record hire</b> on the Grid Technician row.',
+    flow:[
+      ['When a candidate is marked “Hired”', 'Grid Technician (Grid operations) → hire #6 of 2026 · Mon 16 Nov, 10:40 · position stays open', 'Triggered'],
+      ['Get the facts from the tracker', 'Hire #6 · 34 days to hire · 14 applicants · 4 interviews · recruiter Lenka Marková', 'Done'],
+      ['Find the closest open window in Outlook', 'No open window for 3 days → sent anyway on Thu 19 Nov, 08:00', 'Done'],
+      ['Send the Teams card', 'One automatic reminder if there is no answer', 'Scheduled']],
+    narr2:'Tomáš is on site most of the week. If there is no open window within 3 days, the card is sent anyway, so no feedback gets lost.',
+    closeLabel:'Hire 10:40',
+    week:[{d:'Mon 16 Nov', s:'Hire recorded 10:40', v:[2,'skip','No open window']}, {d:'Tue 17 Nov', s:'Field shift', v:[3,'skip','No open window']},
+          {d:'Wed 18 Nov', s:'Training', v:[4,'skip','No open window']}, {d:'Thu 19 Nov', s:'3-day limit', v:[5,'pick','Sent anyway at 08:00']}],
+    dayScan:[2,3,4],
+    cal:[
+      {label:'Mon 16 Nov', ev:[{s:8,e:12,t:'On site: substation Brno-Sever'},{s:12,e:12+20/60,free:true,v:[2,'no','20 min · too short']},{s:12+20/60,e:17,t:'On site: line inspection'}]},
+      {label:'Tue 17 Nov', ev:[{s:8,e:17,t:'Field shift: grid fault repairs'}]},
+      {label:'Wed 18 Nov', ev:[{s:8,e:12.5,t:'Safety training'},{s:12.5,e:12.5+20/60,free:true,v:[4,'no','20 min · too short']},{s:12.5+20/60,e:17,t:'On-call field duty'}]}],
+    log:['New hire recorded <b>Mon 16 Nov, 10:40</b> → start looking right away',
+         'Mon: on site all day, only 20 free minutes → too short',
+         'Tue: field shift all day → no open window',
+         'Wed: training and on-call duty → no open window',
+         'No open window within 3 days → <b>send anyway</b> on Thu 19 Nov, 08:00'],
+    slotResult:'<b>No open window within 3 days.</b><br>The Teams card is sent anyway: Thursday 19 Nov, 08:00, at the start of the day.', slotWarn:true,
+    ts:'Thursday 19 November · 08:00', t1:'08:00', t2:'08:01',
+    cardTitle:'How did the latest Grid Technician hire go?',
+    cardIntro:'Hi Tomáš, you just hired your 6th Grid Technician this year. The position stays open, so we ask after each hire. It takes about a minute.',
+    ctx:[['Position','Grid Technician'],['This hire','#6 in 2026'],['Outcome','Hired · stays open'],['Applicants','14'],['Interviews','4'],['Recruiter','Lenka Marková']],
+    chipQ:'What worked well?', chipTone:'pos', chipOrder:['P','Q','C','J','O'], chips:POS_CHIPS,
+    commentQ:'What could we do even better next time?',
+    defaults:{overall:3, quality:4, comm:4, reasons:['Q','C'],
+      comment:'Good candidate again, but it took 5 weeks because the safety certificate check was slow. Lenka Marková kept me updated the whole time.'},
+    defFollow:{q:'What was the biggest obstacle this time?', a:'Speed'},
+    chats:[['QB','var(--brand)','QuickbackAI','How did the latest Grid Technician hire go?'],['LM','#0f7b6c','Lenka Marková','The contract is signed!'],['GO','#8a5a00','Grid operations team','Shift plan for next week'],['MK','#4b5563','Martin Krejčí','Truck 4 is back in service']],
+    narr3:'<p>Tomáš had no free window for 3 days, so the card arrives on Thursday morning anyway. The facts of this hire are pre-filled.</p><p>After he sends it:</p><ul><li>Copilot asks <b>one</b> smart follow-up question</li><li>The recruiter gets an AI summary of the answer</li></ul>',
+    sentLine:'Grid Technician (Grid operations) · hire #6, position stays open', outcomeLine:'Hire #6 of 2026, filled in 34 days (position stays open)',
+    try5:'<b>Try it:</b> filter by <b>Grid operations</b>, hover over the charts, or ask the data a question.',
+    narr6:'<span class="tag">Step 6 · Closing the loop</span><h2>Better with every hire</h2><p>Because the position never closes, every hire is a chance to learn. Three months after the start, Tomáš gets a quick check: did the hire work out?</p><p>Before the next hire, the recruiter and the manager automatically get what worked and the one thing to fix.</p><div class="try"><b>Try it:</b> answer the 90-day check, then add the actions to the plan for the next hire.</div>',
+    bar6:'Tomáš Beneš · 90-day check and next hire', cap6:'Every hire improves the next one',
+    loop:{ts1:'Monday 1 March 2027 · 10:00 · 3 months after the start date',
+      ts2:'Monday 8 March 2027 · 09:00 · the next Grid Technician search starts',
+      title:'Before the next hire: what worked last time', forLine:'For Lenka Marková and Tomáš Beneš · Grid Technician, continuous hiring',
+      last:['Last hire','34 days'], hint:'Sent automatically when the next search started', ysw:'April 2027'}
+  }
+};
+var SC_ORDER = ['nohire','filled','always'];
+
+var SC, S, timers = [], RS = 'stars';
+function freshState(sc){
+  return {sc: sc || 'nohire', step:0, closed:false, flowProg:0, slotStage:0, slotRunning:false,
+    ans:{overall:0, quality:0, comm:0, reasons:[], comment:''},
+    phase:'form', follow:null, followAns:null, cardStart:null, elapsed:null,
+    toast:false, toastClosed:false, dept:'All', agenda:false, checks:{}, q90:null};
+}
+function later(fn, ms){ var t = setTimeout(fn, ms); timers.push(t); return t; }
+function clearTimers(){ timers.forEach(clearTimeout); timers = []; }
+function slotEnd(){ return SC.log.length + 1; }
+var FLOW_N = 4;
+
+/* finish any half-played animation so a scene never stays stuck */
+function finishPending(){
+  if (S.closed && S.flowProg < FLOW_N) S.flowProg = FLOW_N;
+  if (S.slotRunning){ S.slotStage = slotEnd(); S.slotRunning = false; }
+  if (S.phase === 'typing') S.phase = S.follow ? 'follow' : 'thanks';
+  if (S.phase === 'typing2') S.phase = 'thanks';
+  if (S.phase !== 'form') S.toast = true;
+}
+
+/* ================= navigation ================= */
+function go(n){
+  n = Math.max(0, Math.min(STEPS.length-1, n));
+  finishPending(); clearTimers(); hideTip();
+  S.step = n;
+  var id = STEPS[n].id;
+  $$('.scene').forEach(function(el){ el.classList.toggle('active', el.dataset.scene === id); });
+  renderNav();
+  $('#main').scrollTop = 0;
+  if (ENTER[id]) ENTER[id]();
+}
+function renderNav(){
+  $('#nav').innerHTML = STEPS.map(function(s,i){
+    return '<button data-go="'+i+'" class="'+(i===S.step?'active':(i<S.step?'done':''))+'">'+esc(s.label)+'</button>';
+  }).join('');
+  var st = STEPS[S.step];
+  var prefix = (S.step>0 && S.step<STEPS.length-1) ? 'Step '+S.step+' of '+(STEPS.length-2) : st.label;
+  var c = st.id === 'loop' ? SC.cap6 : st.cap;
+  $('#caption').innerHTML = '<b>'+esc(prefix)+'</b> · '+esc(c);
+  $('#prevBtn').disabled = S.step === 0;
+  $('#nextBtn').innerHTML = S.step === STEPS.length-1 ? '↺ Start again' : 'Next →';
+}
+function applyScenario(){
+  SC = SCENARIOS[S.sc];
+  $('#scPick').innerHTML = SC_ORDER.map(function(k){
+    var c = SCENARIOS[k];
+    return '<button type="button" data-sc="'+k+'" class="'+(k===S.sc?'on':'')+'"><b>'+esc(c.pickTitle)+'</b><span>'+esc(c.pickSub)+'</span></button>';
+  }).join('');
+  $('#scFacts').innerHTML = SC.facts.map(function(f){ return '<dt>'+esc(f[0])+'</dt><dd>'+esc(f[1])+'</dd>'; }).join('') + '<dt>Outcome</dt><dd>'+SC.outcomePill+'</dd>';
+  $('#narr1').innerHTML = SC.narr1;
+  $('#try1').innerHTML = SC.try1;
+  $('#narr2').innerHTML = SC.narr2;
+  $('#bar2').textContent = SC.mgr;
+  $('#narr3').innerHTML = SC.narr3;
+  $('#bar3').textContent = SC.mgr;
+  $('#clist').innerHTML = SC.chats.map(function(c,i){
+    return '<div class="ci'+(i===0?' on':'')+'"><div class="av" style="background:'+c[1]+'">'+esc(c[0])+'</div><div><div class="nm">'+esc(c[2])+'</div><div class="pv">'+esc(c[3])+'</div></div></div>';
+  }).join('');
+  $('#try5').innerHTML = SC.try5;
+  $('#narr6').innerHTML = SC.narr6;
+  $('#bar6').textContent = SC.bar6;
+  $$('#scSwitch [data-sc]').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-sc') === S.sc); });
+}
+function setScenario(k){
+  if (!SCENARIOS[k] || k === S.sc) return;
+  var step = S.step;
+  clearTimers();
+  S = freshState(k);
+  applyScenario();
+  go(step);
+}
+document.addEventListener('click', function(e){
+  var g = e.target.closest('[data-go]');
+  if (g){ go(parseInt(g.getAttribute('data-go'),10)); return; }
+  var s = e.target.closest('[data-sc]');
+  if (s) setScenario(s.getAttribute('data-sc'));
+});
+$('#prevBtn').onclick = function(){ go(S.step-1); };
+$('#nextBtn').onclick = function(){ go(S.step === STEPS.length-1 ? 0 : S.step+1); };
+$('#resetBtn').onclick = function(){ clearTimers(); S = freshState(S.sc); applyScenario(); go(0); };
+function toggleFs(){
+  try{
+    var pr = !document.fullscreenElement ? document.documentElement.requestFullscreen() : document.exitFullscreen();
+    if (pr && pr.catch) pr.catch(function(){});
+  }catch(err){}
+}
+$('#fsBtn').onclick = toggleFs;
+document.addEventListener('keydown', function(e){
+  var t = e.target.tagName;
+  if (t === 'TEXTAREA' || t === 'INPUT') return;
+  if (e.key === 'ArrowRight' || e.key === 'PageDown'){ e.preventDefault(); go(S.step+1); }
+  else if (e.key === 'ArrowLeft' || e.key === 'PageUp'){ e.preventDefault(); go(S.step-1); }
+  else if (e.key === 'f' || e.key === 'F'){ toggleFs(); }
+  else if (e.key === 'Home'){ go(0); }
+});
+
+/* ================= tooltip ================= */
+var tip = $('#tip');
+function showTip(e, html){
+  tip.innerHTML = html; tip.style.display = 'block';
+  var x = e.clientX + 14, y = e.clientY + 14;
+  var w = tip.offsetWidth, h = tip.offsetHeight;
+  if (x + w > window.innerWidth - 8) x = e.clientX - w - 14;
+  if (y + h > window.innerHeight - 8) y = e.clientY - h - 14;
+  tip.style.left = x+'px'; tip.style.top = y+'px';
+}
+function hideTip(){ tip.style.display = 'none'; }
+
+/* ================= STEP 1: trigger ================= */
+var TRK = [
+  {role:'Data Analyst', dept:'IT', mgr:'Martin Novák', days:'74', status:'Interviewing', sc:'nohire'},
+  {role:'Customer Care Specialist', dept:'Customer care', mgr:'Jana Veselá', days:'45', status:'Offer accepted', sc:'filled'},
+  {role:'Grid Technician', dept:'Grid operations', mgr:'Tomáš Beneš', days:'Always open', status:'Open · continuous', sc:'always'},
+  {role:'HR Business Partner', dept:'HR', mgr:'Lucie Králová', days:'38', status:'Filled', fb:'Received'}
+];
+function statusPill(s){
+  var c = (s === 'Filled' || s === 'Closed – filled') ? 'p-pos' : (s === 'Closed – not filled' ? 'p-neg' : 'p-blue');
+  return '<span class="pill '+c+'">'+esc(s)+'</span>';
+}
+function renderTracker(){
+  var rows = TRK.filter(function(r){ return r.sc === S.sc; }).concat(TRK.filter(function(r){ return r.sc !== S.sc; }));
+  var h = '<tr><th>Position</th><th>Department</th><th>Hiring manager</th><th>Days open</th><th>Status</th><th>Manager feedback</th></tr>';
+  rows.forEach(function(r){
+    var key = r.sc === S.sc;
+    var status = r.status, fb = r.fb ? '<span class="pill p-pos">'+CHECK+' '+r.fb+'</span>' : '<span style="color:var(--muted)">–</span>';
+    var actions = '';
+    if (key){
+      if (S.closed){
+        status = SC.statusClosed;
+        if (S.phase !== 'form') fb = '<span class="pill p-pos">'+CHECK+' Received</span>';
+        else if (S.flowProg >= FLOW_N) fb = '<span class="pill p-warn">'+esc(SC.cardPlanned)+'</span>';
+        else fb = '<span class="pill p-neu">Preparing…</span>';
+      } else {
+        actions = '<div class="acts" style="margin-top:6px"><span style="font-size:12px;color:var(--muted);align-self:center">'+esc(SC.actPrefix)+'</span><button class="btn small primary" id="closeBtn">'+esc(SC.closeBtn)+'</button></div>';
+      }
+    }
+    h += '<tr class="'+(key?'hl':'')+'"><td><b>'+esc(r.role)+'</b>'+actions+'</td><td>'+esc(r.dept)+'</td><td>'+esc(r.mgr)+'</td><td>'+esc(r.days)+'</td><td>'+statusPill(status)+'</td><td>'+fb+'</td></tr>';
+  });
+  $('#trk').innerHTML = h;
+  var b = $('#closeBtn');
+  if (b) b.onclick = runFlow;
+}
+function renderFlow(){
+  $('#flowSteps').innerHTML = SC.flow.map(function(f,i){
+    var cls = '', st = 'Waiting';
+    if (S.closed && i < S.flowProg){ cls = 'ok'; st = f[2]; }
+    else if (S.closed && i === S.flowProg){ cls = 'run'; st = 'Running…'; }
+    else if (!S.closed){ st = '–'; }
+    return '<div class="fstep '+cls+'"><div class="n">'+(cls==='ok'?CHECK:(i+1))+'</div><div><div class="t">'+esc(f[0])+'</div><div class="d">'+esc(f[1])+'</div></div><div class="st">'+st+'</div></div>';
+  }).join('');
+}
+function runFlow(){
+  S.closed = true; S.flowProg = 0;
+  renderTracker(); renderFlow();
+  for (var i=1; i<=FLOW_N; i++){
+    (function(k){ later(function(){ S.flowProg = k; renderFlow(); if (k===FLOW_N) renderTracker(); }, 800*k); })(i);
+  }
+}
+
+/* ================= STEP 2: closest open window ================= */
+var PXH = 40;
+function fmtH(h){ var mins = Math.round(h*60), hh = Math.floor(mins/60), mm = mins%60; return (hh<10?'0':'')+hh+':'+(mm<10?'0':'')+mm; }
+function renderTiming(){
+  var st = S.slotStage, L = SC.log.length;
+  $('#week').innerHTML = SC.week.map(function(w,i){
+    var cls = i === 0 ? 'closed' : '', s = w.s;
+    if (w.v && st >= w.v[0]){ cls += ' ' + w.v[1]; s = w.v[2]; }
+    else if (SC.dayScan[i] === st) cls += ' scan';
+    return '<div class="wd '+cls+'"><b>'+w.d+'</b><span class="s">'+s+'</span></div>';
+  }).join('');
+  var H = 9 * PXH;
+  var html = '<div class="chd"></div>' + SC.cal.map(function(d){ return '<div class="chd">'+esc(d.label)+'</div>'; }).join('');
+  html += '<div class="hours" style="height:'+H+'px">';
+  for (var h=9; h<=16; h++) html += '<span style="top:'+((h-8)*PXH)+'px">'+fmtH(h)+'</span>';
+  html += '</div>';
+  SC.cal.forEach(function(d, i){
+    var inner = '';
+    for (var hh=9; hh<17; hh++) inner += '<div class="hl" style="top:'+((hh-8)*PXH)+'px"></div>';
+    d.ev.forEach(function(ev){
+      var top = (ev.s-8)*PXH+1, ht = Math.max(8, (ev.e-ev.s)*PXH-2);
+      if (ev.free || ev.ooo){
+        var cls = ev.ooo ? 'ooo' : 'free', note = ev.ooo ? ev.t : 'Free';
+        if (ev.v && st >= ev.v[0]){ cls += ' ' + ev.v[1]; note = ev.v[2]; }
+        if (ht < 16) cls += ' tiny';
+        inner += '<div class="ev '+cls+'" style="top:'+top+'px;height:'+ht+'px">'+(ev.ooo ? '' : fmtH(ev.s)+' ')+esc(note)+'</div>';
+      } else {
+        inner += '<div class="ev busy" style="top:'+top+'px;height:'+ht+'px"><b>'+esc(ev.t)+'</b>'+(ht > 30 ? '<br>'+fmtH(ev.s)+'–'+fmtH(ev.e) : '')+'</div>';
+      }
+    });
+    if (i === 0) inner += '<div class="before" style="height:'+((T1040-8)*PXH)+'px"><span>'+esc(SC.closeLabel)+'</span></div>';
+    html += '<div class="dcol'+(SC.dayScan[i] === st ? ' scan' : '')+'" style="height:'+H+'px">'+inner+'</div>';
+  });
+  $('#cal3').innerHTML = html;
+  if (st === 0){
+    $('#ruleLog').innerHTML = '<li style="color:var(--muted);list-style:none;margin-left:-18px">Press “Find the closest open window”.</li>';
+  } else {
+    $('#ruleLog').innerHTML = SC.log.slice(0, Math.min(st, L)).map(function(l){ return '<li>'+l+'</li>'; }).join('');
+  }
+  var r = $('#slotResult');
+  r.classList.toggle('warn', !!SC.slotWarn);
+  if (st > L){ r.innerHTML = SC.slotResult; r.classList.add('show'); }
+  else r.classList.remove('show');
+  $('#findSlotBtn').disabled = S.slotRunning;
+  $('#findSlotBtn').textContent = st > L ? 'Run it again' : 'Find the closest open window';
+}
+function runSlot(){
+  S.slotRunning = true; S.slotStage = 0; renderTiming();
+  var end = slotEnd();
+  for (var i=1; i<=end; i++){
+    (function(k){ later(function(){ S.slotStage = k; if (k === end) S.slotRunning = false; renderTiming(); }, 900*k); })(i);
+  }
+}
+$('#findSlotBtn').onclick = runSlot;
+
+/* ================= STEP 3: Teams card ================= */
+var FACE_COL = ['', '#d64545', '#e8833a', '#d9a400', '#7cb342', '#2e9e44'];
+var FACE_MOUTH = ['', 'M8 17 Q12 13 16 17', 'M8.5 16.5 Q12 14.6 15.5 16.5', 'M8.5 15.5 L15.5 15.5', 'M8.5 14.5 Q12 16.6 15.5 14.5', 'M8 14 Q12 18.5 16 14'];
+function starsHtml(key, val){
+  var h = '<div class="stars'+(RS === 'nums' ? ' nums' : RS === 'faces' ? ' faces' : '')+'" data-key="'+key+'">';
+  for (var i=1;i<=5;i++){
+    if (RS === 'nums'){
+      h += '<button type="button" data-v="'+i+'" class="'+(i===val?'on':'')+'" aria-label="'+i+' of 5" title="'+RATING_LABEL[i]+'">'+i+'</button>';
+    } else if (RS === 'faces'){
+      var on = i === val, c = on ? FACE_COL[i] : '#b9bccd', f = on ? '#fff' : '#b9bccd';
+      h += '<button type="button" data-v="'+i+'" aria-label="'+i+' of 5" title="'+RATING_LABEL[i]+'"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="'+(on?c:'none')+'" stroke="'+c+'" stroke-width="1.6"/><circle cx="8.6" cy="10" r="1.2" fill="'+f+'"/><circle cx="15.4" cy="10" r="1.2" fill="'+f+'"/><path d="'+FACE_MOUTH[i]+'" fill="none" stroke="'+f+'" stroke-width="1.6" stroke-linecap="round"/></svg></button>';
+    } else {
+      var s = i <= val;
+      h += '<button type="button" data-v="'+i+'" aria-label="'+i+' of 5" title="'+RATING_LABEL[i]+'"><svg viewBox="0 0 24 24"><path d="'+STAR+'" fill="'+(s?'#E8A317':'none')+'" stroke="'+(s?'#E8A317':'#b9bccd')+'" stroke-width="1.6" stroke-linejoin="round"/></svg></button>';
+    }
+  }
+  return h + '<span class="lab">'+(val?RATING_LABEL[val]:'')+'</span></div>';
+}
+function cardHtml(){
+  var a = S.ans;
+  var rs = SC.chipOrder.map(function(c){ return '<button type="button" data-r="'+c+'" class="'+(a.reasons.indexOf(c)>=0?'on':'')+'">'+esc(SC.chips[c])+'</button>'; }).join('');
+  return '<div class="acard" id="acard">'+
+    '<div class="ah"><h3>'+esc(SC.cardTitle)+'</h3><p>'+esc(SC.cardIntro)+'</p></div>'+
+    '<div class="ctx">'+SC.ctx.map(function(c){ return '<div>'+esc(c[0])+'<b>'+esc(c[1])+'</b></div>'; }).join('')+'</div>'+
+    '<div class="ab">'+
+      '<div class="q"><span class="ql">Overall, how satisfied are you with the process?</span>'+starsHtml('overall', a.overall)+'</div>'+
+      '<div class="q"><span class="ql">How good were the candidates we sent you?</span>'+starsHtml('quality', a.quality)+'</div>'+
+      '<div class="q"><span class="ql">How was communication with the recruiter?</span>'+starsHtml('comm', a.comm)+'</div>'+
+      '<div class="q"><span class="ql">'+esc(SC.chipQ)+' <em>Pick all that apply</em></span><div class="reasons">'+rs+'</div></div>'+
+      '<div class="q"><label for="cmt">'+esc(SC.commentQ)+' <em style="font-weight:400;color:var(--muted)">Optional</em></label><textarea id="cmt" placeholder="A sentence or two is enough">'+esc(a.comment)+'</textarea></div>'+
+    '</div>'+
+    '<div class="af"><span class="hint">Facts pre-filled from the tracker</span><button class="tbtn" id="sendCard">Send feedback</button></div>'+
+  '</div>';
+}
+function sentHtml(){
+  var a = S.ans, pc = SC.chipTone === 'pos' ? 'p-pos' : 'p-blue';
+  return '<div class="acard"><div class="ah"><h3 style="color:var(--pos)">'+CHECK+' Feedback sent</h3><p>'+esc(SC.sentLine)+'</p></div>'+
+    '<div class="ab sent"><div class="row"><span class="pill p-neu">Overall '+a.overall+'/5</span><span class="pill p-neu">Candidates '+a.quality+'/5</span><span class="pill p-neu">Recruiter communication '+a.comm+'/5</span></div>'+
+    (a.reasons.length?'<div class="row">'+a.reasons.map(function(r){return '<span class="pill '+pc+'">'+esc(SC.chips[r])+'</span>';}).join('')+'</div>':'')+
+    (a.comment.trim()?'<p style="margin:8px 0 0;color:var(--ink2)">“'+esc(a.comment.trim())+'”</p>':'')+
+    '</div></div>';
+}
+function botMsg(inner, time){
+  return '<div class="msg"><div class="av" style="background:var(--brand)">QB</div><div style="min-width:0;flex:1"><div class="who">QuickbackAI · '+(time||SC.t1)+'</div>'+inner+'</div></div>';
+}
+function meMsg(text, time){
+  return '<div class="msg me"><div style="min-width:0"><div class="who" style="text-align:right">'+(time||SC.t2)+'</div><div class="bubble">'+esc(text)+'</div></div></div>';
+}
+function computeFollow(a){
+  if (a.quality && a.quality <= 2) return {q:'You rated candidate quality '+a.quality+'/5. What was missing most?', opts:['Key technical skills','Enough experience','Czech or English level','Motivation / team fit']};
+  if (SC.filled){
+    if (a.overall <= 3) return {q:'What was the biggest obstacle this time?', opts:['Speed','Candidate quality','Communication','Job ad']};
+    return {q:'Great result! What helped most this time?', opts:['Strong shortlist','Fast process','Good teamwork with the recruiter','Clear job ad']};
+  }
+  if (a.reasons.indexOf('S') >= 0) return {q:'Roughly how far apart were the salary expectations?', opts:['Under 10 %','10–20 %','20–30 %','Over 30 %']};
+  if (a.overall <= 3 && !a.comment.trim()) return {q:'What is the one thing we should change next time?', opts:['Faster process','Better pre-screening','Clearer job description','Better salary range']};
+  return null;
+}
+function fmtTime(sec){ sec = Math.max(1, Math.round(sec)); var m = Math.floor(sec/60), s = sec%60; return m+':'+(s<10?'0':'')+s; }
+function renderCard(){
+  var h = '<div class="ts">'+esc(SC.ts)+'</div>';
+  if (S.phase === 'form'){
+    h += botMsg(cardHtml());
+  } else {
+    h += botMsg(sentHtml());
+    if (S.phase === 'typing'){
+      h += botMsg('<div class="bubble typing"><span></span><span></span><span></span></div>', SC.t2);
+    } else if (S.follow){
+      var q = '<div class="bubble"><div style="font-size:12px;color:var(--ai);font-weight:600;display:flex;gap:5px;align-items:center;margin-bottom:4px">'+SPARK+' One quick follow-up</div>'+esc(S.follow.q);
+      if (S.phase === 'follow') q += '<div class="qr">'+S.follow.opts.map(function(o){ return '<button type="button" data-fo="'+esc(o)+'">'+esc(o)+'</button>'; }).join('')+'</div>';
+      q += '</div>';
+      h += botMsg(q, SC.t2);
+      if (S.followAns) h += meMsg(S.followAns, SC.t2);
+      if (S.phase === 'typing2') h += botMsg('<div class="bubble typing"><span></span><span></span><span></span></div>', SC.t2);
+    }
+    if (S.phase === 'thanks'){
+      h += botMsg('<div class="bubble">Thank you, '+esc(SC.mgrFirst)+', that’s all! '+(S.elapsed && S.elapsed >= 15 ? 'You answered in <b>'+fmtTime(S.elapsed)+'</b>. ' : '')+'Your feedback goes to the recruitment team and is reported per department, never as an individual ranking.</div>', SC.t2);
+    }
+  }
+  var m = $('#msgs'); m.innerHTML = h;
+  wireCard();
+  m.scrollTop = S.phase === 'form' ? 0 : m.scrollHeight;
+  renderToast();
+  $('#autofillBtn').disabled = S.phase !== 'form';
+}
+function canSend(){ return S.ans.overall && S.ans.quality && S.ans.comm; }
+function wireCard(){
+  $$('#msgs .stars').forEach(function(box){
+    box.onclick = function(e){
+      var b = e.target.closest('button'); if (!b || !box.parentNode) return;
+      var key = box.getAttribute('data-key');
+      S.ans[key] = parseInt(b.getAttribute('data-v'),10);
+      var tmp = document.createElement('div'); tmp.innerHTML = starsHtml(key, S.ans[key]);
+      box.parentNode.replaceChild(tmp.firstChild, box);
+      wireCard();
+      updateSend();
+    };
+  });
+  $$('#msgs .reasons button').forEach(function(b){
+    b.onclick = function(){
+      var c = b.getAttribute('data-r'), i = S.ans.reasons.indexOf(c);
+      if (i>=0) S.ans.reasons.splice(i,1); else S.ans.reasons.push(c);
+      b.classList.toggle('on');
+    };
+  });
+  var t = $('#cmt'); if (t) t.oninput = function(){ S.ans.comment = t.value; };
+  var send = $('#sendCard'); if (send){ send.onclick = submitCard; updateSend(); }
+  $$('#msgs [data-fo]').forEach(function(b){ b.onclick = function(){ answerFollow(b.getAttribute('data-fo')); }; });
+}
+function updateSend(){
+  var send = $('#sendCard'); if (!send) return;
+  send.disabled = !canSend();
+  send.title = canSend() ? '' : 'Please give the three ratings first';
+}
+function submitCard(){
+  if (!canSend()) return;
+  var t = $('#cmt'); if (t) S.ans.comment = t.value;
+  S.elapsed = S.cardStart ? (Date.now() - S.cardStart)/1000 : null;
+  S.follow = computeFollow(S.ans);
+  S.phase = 'typing';
+  renderCard();
+  later(function(){ S.phase = S.follow ? 'follow' : 'thanks'; renderCard(); }, 1300);
+  later(function(){ S.toast = true; renderToast(); }, 1900);
+}
+function answerFollow(o){
+  S.followAns = o; S.phase = 'typing2'; renderCard();
+  later(function(){ S.phase = 'thanks'; renderCard(); }, 1000);
+}
+function renderToast(){
+  var el = $('#toast');
+  if (!(S.toast && !S.toastClosed && S.step === 3)){ el.classList.remove('show'); return; }
+  var a = S.ans, an = analyse(a);
+  var tone = a.overall <= 2 ? ['', 'Needs attention', 'p-neg'] : (a.overall >= 4 ? ['good', 'Went well', 'p-pos'] : ['mid', 'Mixed', 'p-warn']);
+  el.className = 'toast ' + tone[0];
+  el.innerHTML = '<button class="x" aria-label="Close">×</button><b><span style="color:var(--ai);vertical-align:-2px">'+SPARK+'</span> AI summary sent to '+esc(SC.rec)+' (recruiter)</b>'+
+    '<span class="pill '+tone[2]+'">'+tone[1]+' · '+a.overall+'/5</span><div style="margin-top:6px">'+esc(an.summary)+'</div>'+
+    '<div style="font-size:11.5px;color:var(--muted);margin-top:6px">Automatic Teams message'+(a.overall <= 2 ? ' · low score also flagged on the HR dashboard' : '')+'</div>';
+  el.classList.add('show');
+  el.querySelector('.x').onclick = function(){ S.toastClosed = true; el.classList.remove('show'); };
+}
+$('#autofillBtn').onclick = function(){
+  if (S.phase !== 'form') return;
+  S.ans = clone(SC.defaults);
+  renderCard();
+};
+$$('#rstyle [data-rs]').forEach(function(b){
+  b.onclick = function(){
+    RS = b.getAttribute('data-rs');
+    $$('#rstyle [data-rs]').forEach(function(x){ x.classList.toggle('on', x === b); });
+    if (S.step === 3 && S.phase === 'form'){ var t = $('#cmt'); if (t) S.ans.comment = t.value; renderCard(); }
+  };
+});
+
+/* ================= STEP 4: AI analysis ================= */
+function getAns(){ return S.phase !== 'form' ? S.ans : SC.defaults; }
+function getFollow(){
+  if (S.phase !== 'form') return (S.follow && S.followAns) ? {q:S.follow.q, a:S.followAns} : null;
+  return SC.defFollow;
+}
+var NAME_RE;
+try { NAME_RE = new RegExp('(?<!\\p{L})(\\p{Lu}\\p{Ll}+)\\s+(\\p{Lu}\\p{Ll}+)(?!\\p{L})', 'gu'); }
+catch(err){ NAME_RE = /\b([A-Z][a-z]+)\s+([A-Z][a-z]+)\b/g; }
+var NOT_NAMES = ['The','Two','Three','One','A','An','Data','Power','Our','We','He','She','They','It','This','That','Also','But','And','In','On','At','Customer','Grid','Business','Next','Last','Very','Good','Great','Not','No','Some','All','Most','Many','Other','Others','Process','Salary','Junior','Senior','Microsoft','Excel','Teams','Thank','Thanks','Please','Maybe','Overall','IT','I'];
+function redact(text){
+  var names = [], raw = '', clean = '', last = 0, m;
+  NAME_RE.lastIndex = 0;
+  while ((m = NAME_RE.exec(text)) !== null){
+    if (NOT_NAMES.indexOf(m[1]) >= 0){ NAME_RE.lastIndex = m.index + m[1].length; continue; }
+    names.push(m[0]);
+    raw += esc(text.slice(last, m.index)) + '<mark>'+esc(m[0])+'</mark>';
+    clean += esc(text.slice(last, m.index)) + '<mark>[name removed]</mark>';
+    last = m.index + m[0].length;
+  }
+  raw += esc(text.slice(last)); clean += esc(text.slice(last));
+  return {raw:raw, clean:clean, names:names};
+}
+var KW = {
+  S:['salary','money',' pay','paid','range','%','expectation','budget','benefit'],
+  K:['skill','power bi','sql','python','excel','experience','technical','knowledge','lacked'],
+  Q:['quality','weak','shortlist','profile',' cv','unsuitable','strong candidates'],
+  P:['slow','too long','took','weeks','delay','fast','quick','lost','waiting'],
+  C:['communicat','update','informed','respond','reply','contact'],
+  J:['description','requirement','unclear','job ad','posting','advert']
+};
+var NEG = [' but ',' not ',' no ','lack','too ','slow','weak','lost','poor','bad ','missing','difficult','hard','more than','below','unclear',"didn't","couldn't","wasn't",'didn’t','couldn’t','wasn’t','never','late','problem','issue','only ','dropped'];
+var POS = ['good','great','strong','fast','quick','helpful','clear','excellent',' well','smooth','happy'];
+function analyse(a){
+  var text = a.comment || '', lower = text.toLowerCase(), res = {};
+  function get(c){ return res[c] || (res[c] = {neg:0,pos:0,neu:0}); }
+  text.split(/[.!?;\n]+/).forEach(function(s){
+    if (!s.trim()) return;
+    var l = ' '+s.toLowerCase()+' ';
+    var neg = NEG.some(function(w){ return l.indexOf(w) >= 0; });
+    var pos = POS.some(function(w){ return l.indexOf(w) >= 0; });
+    TOPIC_ORDER.forEach(function(c){
+      if (KW[c].some(function(k){ return l.indexOf(k) >= 0; })){
+        var r = get(c); if (neg) r.neg++; else if (pos) r.pos++; else r.neu++;
+      }
+    });
+  });
+  a.reasons.forEach(function(r){ if (TOPICS[r]){ if (SC.chipTone === 'pos') get(r).pos++; else get(r).neg++; } });
+  if (a.quality && a.quality <= 2) get('Q').neg++; else if (a.quality >= 4) get('Q').pos++;
+  if (a.comm && a.comm <= 2) get('C').neg++; else if (a.comm >= 4) get('C').pos++;
+  var topics = TOPIC_ORDER.filter(function(c){ return res[c]; }).map(function(c){
+    var r = res[c]; return {code:c, name:TOPICS[c], tone: r.neg ? 'neg' : (r.pos ? 'pos' : 'neu')};
+  });
+  var tOrder = SC.filled ? {pos:0, neg:1, neu:2} : {neg:0, pos:1, neu:2};
+  topics.sort(function(x,y){ return tOrder[x.tone]-tOrder[y.tone]; });
+  var pm = text.match(/(\d{1,3})\s?%/), pct = pm ? pm[1] : null;
+  var shift = lower.indexOf('shift') >= 0, cert = lower.indexOf('certificate') >= 0;
+  var PH = {
+    S:{neg: pct ? 'salary expectations about '+pct+' % above our range' : 'our salary range is below what candidates expect', pos:'the salary range was competitive'},
+    K:{neg:'key skills are hard to find on the market', pos:'candidates had the right skills'},
+    Q:{neg:'shortlist quality below expectations', pos:'a strong shortlist'},
+    P:{neg: cert ? 'the safety certificate check made the process slow' : (lower.indexOf('lost') >= 0 ? 'the process was too slow and a candidate was lost' : 'the process was too slow'), pos:'a fast process'},
+    C:{neg:'communication with the recruiter could be better', pos:'recruiter communication rated well'},
+    J:{neg: shift ? 'the job ad should mention shift work'+(lower.indexOf('dropped') >= 0 ? ', candidates dropped out late' : '') : 'the job description was unclear', pos:'a clear job ad'}
+  };
+  var negs = topics.filter(function(t){ return t.tone==='neg'; }).map(function(t){ return PH[t.code].neg; });
+  var poss = topics.filter(function(t){ return t.tone==='pos'; }).map(function(t){ return PH[t.code].pos; });
+  var summary;
+  if (SC.filled){
+    summary = 'Hired. ' + (poss.length ? 'Worked well: '+poss.join('; ')+'.' : 'Nothing specific praised.') + (negs.length ? ' To improve: '+negs.join('; ')+'.' : '');
+  } else {
+    summary = 'No hire. ' + (negs.length ? cap(negs.join('; '))+'.' : 'No specific problems named.') + (poss.length ? ' Positive: '+poss.join('; ')+'.' : '');
+  }
+  return {topics:topics, summary:summary, pct:pct, shift:shift, cert:cert, phrases:PH,
+    negCodes: topics.filter(function(t){ return t.tone==='neg'; }).map(function(t){ return t.code; }),
+    posCodes: topics.filter(function(t){ return t.tone==='pos'; }).map(function(t){ return t.code; })};
+}
+var PROMPT = 'You analyse feedback from hiring managers for the HR recruitment team.\n\nInput: the manager\'s ratings, the options they ticked and their comment.\n\n1. Replace every person\'s name with [name removed]. Remove e-mails, phone numbers and other personal details.\n2. Tag the feedback with topics from this fixed list only:\n   Salary, Skills availability, Candidate quality, Process speed, Communication, Job description.\n3. Give each topic a tone: positive, neutral or negative.\n4. Write a one-sentence summary in plain English.\n5. Don\'t guess. If something is unclear, leave it out.\n\nReturn JSON only:\n{"clean_comment": "...", "topics": [{"topic": "...", "tone": "..."}], "summary": "..."}';
+function tagHtml(t){
+  var tone = {neg:'negative', pos:'positive', neu:'neutral'}[t.tone];
+  var sym = {neg:'▼', pos:'▲', neu:'●'}[t.tone];
+  return '<span class="tagx '+t.tone+'">'+sym+' '+esc(t.name)+' <small>'+tone+'</small></span>';
+}
+function renderAI(){
+  var a = getAns(), f = getFollow();
+  var r = redact(a.comment || '');
+  var an = analyse(a);
+  var note = S.phase === 'form' ? '<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px">The card in step 3 wasn’t sent, so the demo answers are used here.</div>' : '';
+  $('#st1b').innerHTML = note + (a.comment.trim()
+    ? '<div class="arrow">Comment as written</div><div class="raw">“'+r.raw+'”</div><div class="arrow">Stored version</div><div class="clean">“'+r.clean+'”</div>'
+    : '<div class="raw" style="color:var(--muted)">No comment was written, so only the ratings and ticked options are used.</div>');
+  $('#st2b').innerHTML = '<div class="tags">'+(an.topics.length ? an.topics.map(tagHtml).join('') : '<span style="color:var(--muted)">No topics found</span>')+'</div>'+
+    '<div class="arrow">Based on the comment, the ticked options and the ratings</div>';
+  var rows = [
+    ['Position', esc(SC.role)+' · '+esc(SC.dept)],
+    ['Outcome', esc(SC.outcomeLine)],
+    ['Ratings','Overall '+a.overall+'/5 · Candidates '+a.quality+'/5 · Recruiter communication '+a.comm+'/5'],
+    [SC.filled ? 'What worked (ticked)' : 'Reasons ticked', a.reasons.length ? a.reasons.map(function(x){ return esc(SC.chips[x]); }).join(', ') : '–'],
+    ['Follow-up answer', f ? esc(f.q)+' → <b>'+esc(f.a)+'</b>' : '–'],
+    ['Topics', an.topics.length ? '<div class="tags">'+an.topics.map(tagHtml).join('')+'</div>' : '–'],
+    ['AI summary','<b>'+esc(an.summary)+'</b>'],
+    ['Personal data', '<span class="pill p-pos">'+CHECK+' '+(r.names.length ? r.names.length+' name'+(r.names.length>1?'s':'')+' removed' : 'none found')+'</span>'],
+    ['Time to answer', (S.phase !== 'form' && S.elapsed && S.elapsed >= 15) ? fmtTime(S.elapsed) : '0:52']
+  ];
+  $('#st3b').innerHTML = '<table class="rec">'+rows.map(function(x){ return '<tr><td>'+x[0]+'</td><td>'+x[1]+'</td></tr>'; }).join('')+'</table>';
+  $('#promptText').textContent = PROMPT;
+  ['#st1','#st2','#st3'].forEach(function(id){ $(id).classList.remove('on'); });
+  later(function(){ $('#st1').classList.add('on'); }, 150);
+  later(function(){ $('#st2').classList.add('on'); }, 1000);
+  later(function(){ $('#st3').classList.add('on'); }, 1850);
+}
+$('#replayAi').onclick = function(){ clearTimers(); renderAI(); };
+
+/* ================= STEP 5: dashboard (≈ 250 answers a year) ================= */
+var MONTHS = ['Jun','Jul','Aug','Sep','Oct','Nov'];
+var DEPTS = ['IT','Finance','Grid operations','Customer care','HR'];
+// patterns: [month, dept, outcome, overall, candidates, communication, seconds, negative topics, reasons for no hire, positive topics]
+var RAW = [
+  [0,'Customer care','F',5,4,5,41,'','','CQP'], [0,'IT','F',4,4,4,63,'P','','Q'], [0,'Grid operations','F',4,4,5,38,'','','CP'], [0,'Finance','F',4,3,4,55,'K','','C'],
+  [1,'HR','F',5,5,5,29,'','','QPC'], [1,'IT','N',3,3,4,72,'S','S','C'], [1,'Customer care','F',4,4,4,47,'','','P'], [1,'Grid operations','F',4,3,4,52,'P','','C'],
+  [2,'IT','F',3,3,4,66,'SP','','C'], [2,'Finance','N',3,2,4,81,'KJ','KJ','C'], [2,'Customer care','F',4,4,5,35,'','','CQ'], [2,'Grid operations','F',5,4,5,40,'','','QC'],
+  [3,'IT','N',2,2,4,77,'SK','SK',''], [3,'HR','F',4,4,4,44,'P','','Q'], [3,'Customer care','F',4,3,4,50,'Q','','C'],
+  [4,'IT','N',2,3,3,69,'SP','SP',''], [4,'Grid operations','N',3,2,4,74,'KP','KP','C'], [4,'Finance','F',4,4,4,45,'S','','QC'], [4,'Customer care','F',4,4,5,39,'','','CP'],
+  [5,'IT','N',2,2,3,58,'SKC','SK',''], [5,'Customer care','F',4,4,4,42,'','','Q'], [5,'Grid operations','F',3,3,4,61,'P','','C']
+];
+var NORESP_BASE = [[0,'Finance'],[2,'IT'],[3,'Grid operations'],[4,'HR'],[5,'Finance']];
+var COPIES = 6;
+function rng(seed){ return function(){ seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function chars(s){ return s.split('').filter(Boolean); }
+var BASE = (function(){
+  var r = rng(20261112), out = [];
+  function jitter(v){ var x = r(); var d = x < 0.18 ? -1 : (x > 0.82 ? 1 : 0); return Math.max(1, Math.min(5, v + d)); }
+  RAW.forEach(function(row){
+    for (var k = 0; k < COPIES; k++){
+      out.push({m:row[0], dept:row[1], out:row[2], overall: k ? jitter(row[3]) : row[3], quality: k ? jitter(row[4]) : row[4], comm: k ? jitter(row[5]) : row[5],
+        secs: Math.max(20, row[6] + Math.round((r() - 0.5) * 24)), topics:chars(row[7]), reasons:chars(row[8]), pos:chars(row[9]), isNew:false});
+    }
+  });
+  return out;
+})();
+var NORESP = [];
+NORESP_BASE.forEach(function(n){ for (var k = 0; k < COPIES; k++) NORESP.push(n); });
+function dataset(){
+  var list = BASE.slice();
+  var a = getAns(), an = analyse(a);
+  var secs = (S.phase !== 'form' && S.elapsed && S.elapsed >= 15 && S.elapsed <= 600) ? Math.round(S.elapsed) : 52;
+  list.push({m:5, dept:SC.dept, out:SC.filled?'F':'N', overall:a.overall, quality:a.quality, comm:a.comm, secs:secs,
+    topics:an.negCodes, pos:an.posCodes, reasons: SC.filled ? [] : a.reasons.filter(function(x){ return x !== 'O'; }), isNew:true});
+  return list;
+}
+function stats(data, dept){
+  var recs = dept === 'All' ? data : data.filter(function(r){ return r.dept === dept; });
+  var nores = NORESP.filter(function(n){ return dept === 'All' || n[1] === dept; }).length;
+  var monthly = MONTHS.map(function(_,i){ var v = recs.filter(function(r){ return r.m === i; }).map(function(r){ return r.overall; }); return v.length ? avg(v) : null; });
+  var topics = {}, praise = {};
+  TOPIC_ORDER.forEach(function(c){ topics[c] = 0; praise[c] = 0; });
+  recs.forEach(function(r){
+    r.topics.forEach(function(c){ if (c in topics) topics[c]++; });
+    r.pos.forEach(function(c){ if (c in praise) praise[c]++; });
+  });
+  var reasons = {S:0,K:0,J:0,P:0};
+  var notFilled = recs.filter(function(r){ return r.out === 'N'; }), filled = recs.filter(function(r){ return r.out === 'F'; });
+  notFilled.forEach(function(r){ r.reasons.forEach(function(c){ if (c in reasons) reasons[c]++; }); });
+  return {recs:recs, n:recs.length, invited:recs.length+nores, sat:avg(recs.map(function(r){return r.overall;})),
+    secs:avg(recs.map(function(r){return r.secs;})), comm:avg(recs.map(function(r){return r.comm;})),
+    monthly:monthly, topics:topics, praise:praise, reasons:reasons, nf:notFilled.length,
+    satF:avg(filled.map(function(r){return r.overall;})), satN:avg(notFilled.map(function(r){return r.overall;}))};
+}
+function topicBars(counts){
+  return TOPIC_ORDER.map(function(c){ return [TOPICS[c], counts[c]]; }).filter(function(x){ return x[1] > 0; }).sort(function(a,b){ return b[1]-a[1]; });
+}
+function renderDash(){
+  var data = dataset(), d = S.dept;
+  var st = stats(data, d), all = stats(data, 'All');
+  $('#filters').innerHTML = '<span>Department</span>' + ['All'].concat(DEPTS).map(function(x){
+    return '<button type="button" data-dept="'+esc(x)+'" class="'+(x===d?'on':'')+'">'+(x==='All'?'All departments':esc(x))+'</button>';
+  }).join('');
+  $$('#filters [data-dept]').forEach(function(b){ b.onclick = function(){ S.dept = b.getAttribute('data-dept'); renderDash(); }; });
+
+  var fi = -1, li = -1;
+  st.monthly.forEach(function(v,i){ if (v !== null){ if (fi < 0) fi = i; li = i; } });
+  var delta = (fi >= 0 && li > fi) ? st.monthly[li] - st.monthly[fi] : 0;
+  var sinceTxt = (fi >= 0 && li > fi) ? (delta < 0 ? '▼ ' : '▲ ')+fmt1(Math.abs(delta))+' since '+MONTHS[fi] : 'Not enough months to compare';
+  var rate = Math.round(st.n/st.invited*100);
+  $('#kpis').innerHTML =
+    kpi('Satisfaction', fmt1(st.sat)+' <small>/ 5</small>', sinceTxt, delta < -0.3) +
+    kpi('Response rate', rate+' <small>%</small>', st.n+' of '+st.invited+' managers answered', rate < 70) +
+    kpi('Average time to answer', Math.round(st.secs)+' <small>s</small>', 'Target: about 1 minute', false) +
+    kpi('Searches without a hire', st.nf+' <small>of '+st.n+'</small>', 'Jun–Nov 2026', false);
+
+  renderTrend(st, all, d);
+  renderBars('#praise', topicBars(st.praise), 'mentions', st.n+' answers');
+  renderBars('#topics', topicBars(st.topics), 'mentions', st.n+' answers');
+  renderBars('#reasons', [['Salary expectations',st.reasons.S],['Skills not available',st.reasons.K],['Process too slow',st.reasons.P],['Job description unclear',st.reasons.J]].filter(function(x){ return x[1] > 0; }).sort(function(a,b){ return b[1]-a[1]; }), 'of '+st.nf+' searches', '');
+
+  var rows = '<tr><th>Department</th><th class="num">Answers</th><th class="num">Score</th><th class="num">No hire</th><th></th></tr>';
+  DEPTS.map(function(x){ return {d:x, s:stats(data, x)}; }).sort(function(a,b){ return a.s.sat-b.s.sat; }).forEach(function(o){
+    var hasNew = o.s.recs.some(function(r){ return r.isNew; });
+    var flag = o.s.sat < 3 ? '<span class="pill p-neg">▼ Attention</span>' : '';
+    rows += '<tr class="'+(o.d===d?'sel':'')+'" data-row="'+esc(o.d)+'" style="cursor:pointer"><td>'+esc(o.d)+(hasNew?'<span class="newb">NEW</span>':'')+'</td><td class="num">'+o.s.n+'</td><td class="num"><b>'+fmt1(o.s.sat)+'</b></td><td class="num">'+o.s.nf+'</td><td>'+flag+'</td></tr>';
+  });
+  $('#deptTable').innerHTML = rows;
+  $$('#deptTable [data-row]').forEach(function(tr){ tr.onclick = function(){ S.dept = tr.getAttribute('data-row'); renderDash(); }; });
+
+  renderInsights(data, all);
+  renderAsk(data, all);
+}
+function kpi(k, v, s, bad){ return '<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+'</div><div class="s'+(bad?' bad':'')+'">'+s+'</div></div>'; }
+function renderBars(sel, items, unit, ctx){
+  var max = Math.max.apply(null, items.map(function(x){ return x[1]; }).concat([1]));
+  var el = $(sel);
+  if (!items.length){ el.innerHTML = '<div style="font-size:13px;color:var(--muted)">Nothing reported for this selection.</div>'; return; }
+  el.innerHTML = items.map(function(x){
+    return '<div class="brow" data-tip="<b>'+esc(x[0])+'</b><br>'+x[1]+' '+esc(unit)+(ctx?' · '+esc(ctx):'')+'"><span>'+esc(x[0])+'</span><div class="btrack"><div class="bfill" style="width:'+(x[1]/max*100)+'%"></div></div><span class="bv">'+x[1]+'</span></div>';
+  }).join('');
+  bindTips(el);
+}
+function bindTips(root){
+  Array.prototype.slice.call(root.querySelectorAll('[data-tip]')).forEach(function(n){
+    n.onmousemove = function(e){ showTip(e, n.getAttribute('data-tip')); };
+    n.onmouseleave = hideTip;
+  });
+}
+function renderTrend(st, all, d){
+  var W = 560, H = 250, L = 34, R = 120, T = 14, B = 28;
+  var pw = W-L-R, ph = H-T-B;
+  function x(i){ return L + i*(pw/(MONTHS.length-1)); }
+  function y(v){ return T + (5-v)/(5-1)*ph; }
+  var series = [];
+  if (d !== 'All') series.push({name:'All departments', vals:all.monthly, color:'var(--grey-series)', dash:'5 4'});
+  series.push({name: d==='All' ? 'All departments' : d, vals:st.monthly, color:'var(--brand)', dash:''});
+  var svg = '<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Satisfaction by month">';
+  for (var g=1; g<=5; g++){
+    svg += '<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(g)+'" y2="'+y(g)+'" stroke="#eceef1" stroke-width="1"/>';
+    svg += '<text x="'+(L-8)+'" y="'+(y(g)+4)+'" font-size="11" fill="#5f6873" text-anchor="end">'+g+'</text>';
+  }
+  MONTHS.forEach(function(m,i){ svg += '<text x="'+x(i)+'" y="'+(H-8)+'" font-size="11" fill="#5f6873" text-anchor="middle">'+m+'</text>'; });
+  svg += '<line id="xhair" x1="0" x2="0" y1="'+T+'" y2="'+(T+ph)+'" stroke="#9aa1aa" stroke-width="1" style="display:none"/>';
+  var labels = [];
+  series.forEach(function(s){
+    var p = '', pen = false;
+    s.vals.forEach(function(v,i){ if (v === null){ pen = false; return; } p += (pen?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1)+' '; pen = true; });
+    svg += '<path d="'+p+'" fill="none" stroke="'+s.color+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"'+(s.dash?' stroke-dasharray="'+s.dash+'"':'')+'/>';
+    s.vals.forEach(function(v,i){ if (v !== null) svg += '<circle cx="'+x(i)+'" cy="'+y(v)+'" r="4" fill="'+s.color+'" stroke="#fff" stroke-width="2"/>'; });
+    var last = -1; for (var k=s.vals.length-1; k>=0; k--){ if (s.vals[k] !== null){ last = k; break; } }
+    var nm = s.name === 'All departments' ? 'All' : (s.name.length > 13 ? s.name.slice(0,12)+'…' : s.name);
+    if (last >= 0) labels.push({y:y(s.vals[last]), x:x(last), text:fmt1(s.vals[last])+' '+nm});
+  });
+  labels.sort(function(a,b){ return a.y-b.y; });
+  for (var j=1; j<labels.length; j++){ if (labels[j].y - labels[j-1].y < 14) labels[j].y = labels[j-1].y + 14; }
+  labels.forEach(function(lb){ svg += '<text x="'+(lb.x+9)+'" y="'+(lb.y+4)+'" font-size="11.5" fill="#3d454f" font-weight="600">'+esc(lb.text)+'</text>'; });
+  MONTHS.forEach(function(m,i){
+    var hw = pw/(MONTHS.length-1)/2;
+    svg += '<rect class="hit" data-i="'+i+'" x="'+(x(i)-hw)+'" y="'+T+'" width="'+(hw*2)+'" height="'+ph+'" fill="transparent"/>';
+  });
+  svg += '</svg>';
+  $('#trend').innerHTML = svg;
+  $('#trendLegend').innerHTML = series.length > 1 ? series.slice().reverse().map(function(s){
+    return '<span><i style="background:'+(s.dash ? 'repeating-linear-gradient(90deg,'+s.color+' 0 5px,transparent 5px 9px)' : s.color)+'"></i>'+esc(s.name)+'</span>';
+  }).join('') : '';
+  var xh = $('#xhair');
+  $$('#trend .hit').forEach(function(r){
+    var i = parseInt(r.getAttribute('data-i'),10);
+    r.onmousemove = function(e){
+      xh.setAttribute('x1', x(i)); xh.setAttribute('x2', x(i)); xh.style.display = '';
+      var html = '<b>'+MONTHS[i]+' 2026</b>';
+      series.slice().reverse().forEach(function(s){ html += '<br>'+esc(s.name)+': '+(s.vals[i]===null?'no answers':fmt1(s.vals[i])+' / 5'); });
+      showTip(e, html);
+    };
+    r.onmouseleave = function(){ xh.style.display = 'none'; hideTip(); };
+  });
+}
+function itFacts(data){
+  var it = data.filter(function(r){ return r.dept === 'IT' && r.out === 'N'; });
+  var itS = it.filter(function(r){ return r.reasons.indexOf('S') >= 0 || r.topics.indexOf('S') >= 0; }).length;
+  var itK = it.filter(function(r){ return r.reasons.indexOf('K') >= 0 || r.topics.indexOf('K') >= 0; }).length;
+  var st = stats(data, 'IT');
+  var first = null; st.monthly.forEach(function(v){ if (first === null && v !== null) first = v; });
+  return {n:it.length, s:itS, k:itK, first:first, last:st.monthly[st.monthly.length-1]};
+}
+function rankPraise(all){ return TOPIC_ORDER.map(function(c){ return [c, all.praise[c]]; }).sort(function(a,b){ return b[1]-a[1]; }); }
+function renderInsights(data, all){
+  var it = itFacts(data), pr = rankPraise(all);
+  var items = [
+    ['Salary gap in IT', it.s+' of '+it.n+' IT searches without a hire mention salary expectations above our range.', 'Review IT salary bands with Comp & Ben before the next posting.'],
+    ['Slow process', all.topics.P+' answers say the process took too long. Slow processes can cost us good candidates.', 'Max 2 interview rounds and a decision within 5 working days.'],
+    ['Skills that are hard to find', all.topics.K+' answers mention skills that are scarce on the market, such as Power BI and SQL.', 'Hire juniors with a training plan, or look at internal candidates first.'],
+    ['Working well', 'Managers praise '+TOPICS[pr[0][0]].toLowerCase()+' most often ('+pr[0][1]+' answers). Recruiter communication averages '+fmt1(all.comm)+' / 5.', 'Keep the weekly updates and reuse the set-up of well-rated searches.']
+  ];
+  $('#insights').innerHTML = '<h4><span style="color:var(--ai)">'+SPARK+'</span>Copilot summary · November 2026</h4>' +
+    items.map(function(x,i){ return '<div class="ins"><span class="i">'+(i+1)+'</span><div><b>'+esc(x[0])+'.</b> '+esc(x[1])+'</div><div class="rec2">→ '+esc(x[2])+'</div></div>'; }).join('') +
+    '<div class="ft">Based on '+all.n+' answers from all departments · written by Copilot · checked by HR before sharing</div>';
+}
+function renderAsk(data, all){
+  var it = itFacts(data), pr = rankPraise(all);
+  var depts = DEPTS.map(function(x){ return {d:x, s:stats(data,x)}; }).sort(function(a,b){ return b.s.sat-a.s.sat; });
+  var top = TOPIC_ORDER.map(function(c){ return [c, all.topics[c]]; }).sort(function(a,b){ return b[1]-a[1]; })[0];
+  var fix = {S:'review salary bands for the affected roles', K:'open roles to juniors with a training plan', P:'limit interviews to 2 rounds', Q:'add a short phone screen before sharing CVs', C:'send weekly status updates', J:'rewrite job ads around 5 must-haves'};
+  var QA = {
+    it:['Why do IT searches fail?', 'Since June, IT had <b>'+it.n+' searches without a hire</b>. Managers name salary in '+it.s+' of them and hard-to-find skills in '+it.k+'. Satisfaction in IT fell from '+fmt1(it.first)+' in June to '+fmt1(it.last)+' in November.'],
+    works:['What works best?', 'Managers praise <b>'+TOPICS[pr[0][0]].toLowerCase()+'</b> most often ('+pr[0][1]+' answers), then '+TOPICS[pr[1][0]].toLowerCase()+' ('+pr[1][1]+'). Filled searches score '+fmt1(all.satF)+' / 5 on average, searches without a hire only '+fmt1(all.satN)+'.'],
+    dept:['Which department is most satisfied?', '<b>'+esc(depts[0].d)+'</b> has the highest satisfaction ('+fmt1(depts[0].s.sat)+' / 5 from '+depts[0].s.n+' answers). The lowest is '+esc(depts[depts.length-1].d)+' ('+fmt1(depts[depts.length-1].s.sat)+').'],
+    fix:['What should we fix first?', 'The most common problem is <b>'+TOPICS[top[0]].toLowerCase()+'</b> ('+top[1]+' mentions). A quick win: '+fix[top[0]]+'.']
+  };
+  var order = SC.filled ? ['works','dept','fix','it'] : ['it','dept','fix','works'];
+  $('#askq').innerHTML = order.map(function(k){ return '<button type="button" data-q="'+k+'">'+esc(QA[k][0])+'</button>'; }).join('');
+  var box = $('#askans'); box.classList.remove('show');
+  $$('#askq [data-q]').forEach(function(b){
+    b.onclick = function(){
+      var q = QA[b.getAttribute('data-q')];
+      box.innerHTML = '<span style="color:var(--muted)">Copilot is looking at the data…</span>'; box.classList.add('show');
+      later(function(){ box.innerHTML = '<div style="font-size:12px;color:var(--ai);font-weight:600;display:flex;gap:5px;align-items:center;margin-bottom:4px">'+SPARK+' '+esc(q[0])+'</div>'+q[1]; }, 700);
+    };
+  });
+}
+
+/* ================= STEP 6: lessons ================= */
+var PRIO = ['S','P','K','J','Q','C'];
+var ACTIONS = {
+  S:function(an){ return ['Check the salary range against the market before posting', 'Ask Comp & Ben for a benchmark'+(an.pct ? '; last time candidates expected about '+an.pct+' % more' : '')+'.']; },
+  K:function(){ return ['Move scarce skills from “must have” to “nice to have”', 'Add a training plan, or look at internal candidates first.']; },
+  P:function(an){ return an.cert ? ['Start the safety certificate check right after the first interview', 'Last time it was the slowest step of the process.'] : ['Max 2 interview rounds, decision within 5 working days', 'Book the interview slots in both calendars at the kick-off.']; },
+  Q:function(){ return ['10-minute phone screen before CVs go to the manager', 'Fewer, better-matched CVs.']; },
+  C:function(){ return ['Weekly 5-minute status update from the recruiter', 'A short Teams message every Friday.']; },
+  J:function(an){ return an.shift ? ['Add shift patterns to the job ad', 'Last time candidates dropped out late because the ad didn’t mention shift work.'] : ['Rewrite the job ad together, with Copilot', 'Focus on 5 must-haves and cut the wish list.']; }
+};
+var KEEP = {
+  Q:function(){ return ['Reuse last time’s screening questions and shortlist criteria', 'They produced a strong shortlist.']; },
+  P:function(){ return ['Keep the same interview process', 'Last time the role was filled in '+SC.days+' days.']; },
+  C:function(a){ return ['Keep the weekly status update', 'The manager rated communication '+a.comm+'/5.']; },
+  J:function(){ return ['Reuse last time’s job ad', 'The manager said it worked well.']; },
+  S:function(){ return ['Keep the same salary range', 'It was competitive last time.']; },
+  K:function(){ return ['Keep the same must-have skills', 'Candidates matched them well.']; }
+};
+var RUNNER = ['Contact last time’s runner-up candidates first', 'Only people who agreed to stay in the talent pool (GDPR consent).'];
+var Q90 = ['Better than expected', 'As expected', 'Below expectations'];
+function checkHtml(id, item){
+  if (!(id in S.checks)) S.checks[id] = true;
+  return '<label><input type="checkbox" data-c="'+id+'" '+(S.checks[id]?'checked':'')+(S.agenda?' disabled':'')+'><span><b>'+esc(item[0])+'</b><small>'+esc(item[1])+'</small></span></label>';
+}
+function agendaFooter(hint, btn){
+  return '<div class="af"><span class="hint">'+esc(hint)+'</span>'+
+    (S.agenda ? '<span style="color:var(--pos);font-weight:600;font-size:14px">'+CHECK+' Added</span>' : '<button class="tbtn" id="agendaBtn">'+esc(btn)+'</button>')+'</div>';
+}
+function personMsg(text, time){
+  return '<div class="msg reply"><div class="av" style="background:'+SC.mgrColor+'">'+esc(SC.mgrInit)+'</div><div><div class="who">'+esc(SC.mgr)+' · '+time+'</div><div class="bubble">'+esc(text)+'</div></div></div>';
+}
+function yswHtml(all, when){
+  var ysw = [['Interviews took too long','Max 2 rounds, decision within 5 working days'],['IT salary ranges don’t match the market','IT salary bands reviewed with Comp & Ben'],['Too many CVs that don’t fit','10-minute phone screen before CVs are shared']];
+  return '<div class="ts" style="margin-top:8px">Quarterly update to all hiring managers · '+esc(when)+'</div>' +
+    botMsg('<div class="acard" style="max-width:600px"><div class="ah"><h3>You said, we did</h3><p>What changed because of your feedback</p></div><div class="ab"><div class="ysw"><div class="h">You said</div><div class="h">We did</div>'+
+      ysw.map(function(r){ return '<div>'+esc(r[0])+'</div><div><b>'+esc(r[1])+'</b></div>'; }).join('')+
+      '</div><p style="font-size:13px;color:var(--muted);margin:10px 0 0">Thank you to the '+all.n+' managers who answered since June ('+Math.round(all.n/all.invited*100)+' % response rate).</p></div></div>', '10:00');
+}
+function wireLoop(){
+  $$('#loopMsgs [data-c]').forEach(function(cb){ cb.onchange = function(){ S.checks[cb.getAttribute('data-c')] = cb.checked; }; });
+  var b = $('#agendaBtn'); if (b) b.onclick = function(){
+    S.agenda = true; renderLoop();
+    var box = $('#loopMsgs'), rp = box.querySelector('.reply');
+    if (rp) box.scrollTop += rp.getBoundingClientRect().bottom - box.getBoundingClientRect().bottom + 24;
+  };
+  $$('#loopMsgs [data-q90]').forEach(function(btn){ btn.onclick = function(){ S.q90 = btn.getAttribute('data-q90'); renderLoop(); }; });
+}
+function aiHead(text){
+  return '<span class="ql" style="display:flex;gap:6px;align-items:center"><span style="color:var(--ai)">'+SPARK+'</span>'+esc(text)+'</span>';
+}
+function renderLoop(){ if (SC.filled) renderLoopFilled(); else renderLoopNoHire(); wireLoop(); }
+function renderLoopNoHire(){
+  var a = getAns(), an = analyse(a), data = dataset(), it = itFacts(data), all = stats(data,'All'), f = getFollow();
+  var codes = an.negCodes.filter(function(c){ return ACTIONS[c]; }).sort(byOrder(PRIO));
+  if (!codes.length) codes = ['P','Q'];
+  codes = codes.slice(0,3);
+  var said = an.topics.filter(function(t){ return t.tone !== 'neu'; }).map(function(t){ return '<li>'+esc(cap(an.phrases[t.code][t.tone]))+'</li>'; }).join('') || '<li>No specific problems named</li>';
+  var acts = codes.map(function(c){ return checkHtml(c, ACTIONS[c](an)); }).join('');
+  var card = '<div class="acard" style="max-width:600px"><div class="ah"><h3>Before you start: lessons from the last search</h3><p>For '+esc(SC.rec)+' and '+esc(SC.mgr)+' · '+esc(SC.role)+' ('+esc(SC.dept)+'), 2nd round</p></div>'+
+    '<div class="ctx"><div>Last search<b>'+SC.days+' days</b></div><div>Pipeline<b>'+SC.applicants+' → '+SC.interviews+' interviews</b></div><div>Outcome<b>No hire</b></div></div>'+
+    '<div class="ab">'+
+      '<div class="q">'+aiHead('What the hiring manager said (AI summary)')+'<ul style="margin:0;padding-left:18px;font-size:14px">'+said+(f ? '<li>Missing most: '+esc(f.a)+'</li>' : '')+'</ul></div>'+
+      '<div class="q"><span class="ql">Similar searches</span><div style="font-size:14px">'+it.s+' of '+it.n+' IT searches without a hire since June also mention salary.</div></div>'+
+      '<div class="q"><span class="ql">Suggested actions for the kick-off</span><div class="checks">'+acts+'</div></div>'+
+    '</div>'+ agendaFooter('Sent automatically when the role was reopened', 'Add to kick-off agenda') +'</div>';
+  var h = '<div class="ts">Wednesday 2 December · 09:00 · '+esc(SC.role)+' ('+esc(SC.dept)+') reopened</div>' + botMsg(card, '09:00');
+  if (S.agenda){
+    var first = ACTIONS[codes[0]](an)[0].toLowerCase();
+    h += personMsg('Great, this saves us a long discussion. Let’s start with the first point: '+first+'.', '09:12');
+  }
+  h += yswHtml(all, 'January 2027');
+  $('#loopMsgs').innerHTML = h;
+}
+function renderLoopFilled(){
+  var a = getAns(), an = analyse(a), f = getFollow(), all = stats(dataset(),'All'), Lp = SC.loop;
+  var h = '<div class="ts">'+esc(Lp.ts1)+'</div>';
+  var q = '<div class="acard" style="max-width:560px"><div class="ah"><h3>Quick 90-day check</h3><p>Hi '+esc(SC.mgrFirst)+', your new '+esc(SC.role)+' started 3 months ago. Did the hire turn out as you expected?</p></div><div class="ab">';
+  q += S.q90 ? '<span class="pill p-pos">'+CHECK+' '+esc(S.q90)+'</span>'
+             : '<div class="qr" style="margin-top:0">'+Q90.map(function(o){ return '<button type="button" data-q90="'+esc(o)+'">'+esc(o)+'</button>'; }).join('')+'</div>';
+  q += '<p style="font-size:12.5px;color:var(--muted);margin:10px 0 0">Only used to improve recruitment. This is not a performance review.</p></div></div>';
+  h += botMsg(q, '10:00');
+  if (S.q90) h += botMsg('<div class="bubble">Thanks, '+esc(SC.mgrFirst)+'! Saved as <b>quality of hire</b> for '+esc(SC.dept)+'. Now HR sees not only how fast we hire, but also how well.</div>', '10:01');
+
+  var keep = an.posCodes.filter(function(c){ return KEEP[c]; }).sort(byOrder(['Q','P','C','J','S','K'])).slice(0,2);
+  var fixes = an.negCodes.filter(function(c){ return ACTIONS[c]; }).sort(byOrder(PRIO)).slice(0,1);
+  var acts = keep.map(function(c){ return checkHtml('k'+c, KEEP[c](a)); }).join('') +
+             fixes.map(function(c){ return checkHtml('f'+c, ACTIONS[c](an)); }).join('') +
+             checkHtml('R', RUNNER);
+  var said = an.topics.filter(function(t){ return t.tone === 'pos'; }).map(function(t){ return '<li>'+esc(cap(an.phrases[t.code].pos))+'</li>'; }).join('') +
+             an.topics.filter(function(t){ return t.tone === 'neg'; }).map(function(t){ return '<li><b>To improve:</b> '+esc(an.phrases[t.code].neg)+'</li>'; }).join('');
+  if (f) said += '<li>'+(a.overall <= 3 ? 'Biggest obstacle' : 'Helped most')+': '+esc(f.a)+'</li>';
+  if (!said) said = '<li>No specific comments</li>';
+  var card = '<div class="acard" style="max-width:600px"><div class="ah"><h3>'+esc(Lp.title)+'</h3><p>'+esc(Lp.forLine)+'</p></div>'+
+    '<div class="ctx"><div>'+esc(Lp.last[0])+'<b>'+esc(Lp.last[1])+'</b></div><div>Pipeline<b>'+SC.applicants+' → '+SC.interviews+' interviews</b></div><div>90-day check<b>'+esc(S.q90 || 'Not answered yet')+'</b></div></div>'+
+    '<div class="ab">'+
+      '<div class="q">'+aiHead('What the hiring manager said (AI summary)')+'<ul style="margin:0;padding-left:18px;font-size:14px">'+said+'</ul></div>'+
+      '<div class="q"><span class="ql">Suggested actions</span><div class="checks">'+acts+'</div></div>'+
+    '</div>'+ agendaFooter(Lp.hint, SC.key === 'always' ? 'Add to the plan for the next hire' : 'Add to kick-off agenda') +'</div>';
+  h += '<div class="ts" style="margin-top:8px">'+esc(Lp.ts2)+'</div>' + botMsg(card, '09:00');
+  if (S.agenda){
+    var reply;
+    if (SC.key === 'always') reply = an.cert && S.checks.fP !== false ? 'Good list. Let’s start the certificate check earlier this time.' : 'Good list, let’s keep what worked.';
+    else reply = 'Perfect, same recipe as last time.';
+    if (S.checks.R) reply += ' And yes, let’s contact the runner-ups first.';
+    h += personMsg(reply, '09:20');
+  }
+  h += yswHtml(all, Lp.ysw);
+  $('#loopMsgs').innerHTML = h;
+}
+
+/* ================= scene entry ================= */
+var ENTER = {
+  trigger: function(){ renderTracker(); renderFlow(); },
+  timing: function(){ if (!S.closed){ S.closed = true; S.flowProg = FLOW_N; } renderTiming(); },
+  card: function(){
+    if (!S.closed){ S.closed = true; S.flowProg = FLOW_N; }
+    if (S.slotStage < slotEnd()) S.slotStage = slotEnd();
+    if (S.phase === 'form' && !S.cardStart) S.cardStart = Date.now();
+    renderCard();
+  },
+  ai: renderAI,
+  dash: renderDash,
+  loop: renderLoop
+};
+
+S = freshState('nohire');
+applyScenario();
+go(0);
+})();
+
+</script>
+</body></html>
